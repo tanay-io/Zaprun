@@ -23,11 +23,8 @@ router.post("/webhook/:zapId", async (req, res) => {
   });
   await prisma.zapRunOutbox.create({
     data: {
-      eventType: "ZAP_RUN_CREATED",
       zapRunId: zapRun.id,
-      payload: {
-        zapRunId: zapRun.id,
-      },
+      stepIndex=0,
       status: "pending",
     },
   });

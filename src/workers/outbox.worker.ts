@@ -11,10 +11,10 @@ async function pollOutbox() {
   if (!OutboxEvent) {
     return;
   }
-  await prisma.zapRunOutbox.update({
-    where: { id: OutboxEvent.id },
-    data: { status: "published" },
-  });
+  // await prisma.zapRunOutbox.update({
+  //   where: { id: OutboxEvent.id },
+  //   // data: { status: "published" },
+  // });
   console.log("Outbox event published:", OutboxEvent.id, OutboxEvent.eventType);
 }
 async function startOutboxWorker() {
