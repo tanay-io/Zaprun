@@ -15,7 +15,7 @@ async function pollOutbox() {
   //   where: { id: OutboxEvent.id },
   //   // data: { status: "published" },
   // });
-  console.log("Outbox event published:", OutboxEvent.id, OutboxEvent.eventType);
+  // console.log("Outbox event published:", OutboxEvent.id, OutboxEvent.eventType);
 }
 async function startOutboxWorker() {
   console.log("Outbox worker started");
