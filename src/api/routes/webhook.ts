@@ -32,7 +32,9 @@ router.post("/webhook/:zapId", async (req, res) => {
 
   await publishOutbox(outbox.id);
 
-  return res.status(200).json({ success: true });
+  return res
+    .status(200)
+    .json({ success: true, zapRunId: zapRun.id, outboxId: outbox.id });
 });
 
 export default router;

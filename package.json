@@ -6,9 +6,12 @@
   "scripts": {
     "build": "tsc -p .",
     "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "worker": "ts-node src/workers/outbox.worker.ts"
+    "start:worker": "node dist/workers/consumer.worker.js",
+    "start:all": "npm-run-all --parallel start start:worker",
+    "dev:server": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev:worker": "ts-node-dev --respawn --transpile-only src/workers/consumer.worker.ts",
+    "dev:all": "npm-run-all --parallel dev:server dev:worker",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +29,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
     "@types/pg": "^8.16.0",
+    "npm-run-all": "^4.1.5",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   }

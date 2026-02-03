@@ -1,13 +1,11 @@
 import app from "./api/app";
 import { initProducer } from "./kafka/producer";
-import { startConsumer } from "./kafka/consumer";
 
 const PORT = 3000;
 
 async function main() {
   try {
     await initProducer();
-    await startConsumer();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

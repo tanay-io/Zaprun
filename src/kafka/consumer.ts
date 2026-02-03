@@ -1,19 +1,43 @@
 import { Kafka } from "kafkajs";
 import { handleOutboxJob } from "../workers/handleOutboxJob";
 
+const brokers = process.env.KAFKA_BROKERS?.split(",") ?? ["localhost:9092"];
+const OUTBOX_TOPIC = process.env.OUTBOX_TOPIC ?? "zaprun-outbox";
+
 const kafka = new Kafka({
   clientId: "zap-run-worker",
-  brokers: ["kafka1:9092", "kafka2:9092"],
+  brokers,
 });
 
 const consumer = kafka.consumer({
   groupId: "zaprun-workers",
 });
 
+let topicEnsured = false;
+
+async function ensureOutboxTopic() {
+  if (topicEnsured) return;
+  const admin = kafka.admin();
+  await admin.connect();
+  await admin.createTopics({
+    waitForLeaders: true,
+    topics: [
+      {
+        topic: OUTBOX_TOPIC,
+        numPartitions: 1,
+        replicationFactor: 1,
+      },
+    ],
+  });
+  await admin.disconnect();
+  topicEnsured = true;
+}
+
 export async function startConsumer() {
+  await ensureOutboxTopic();
   await consumer.connect();
   await consumer.subscribe({
-    topic: "zaprun-outbox",
+    topic: OUTBOX_TOPIC,
     fromBeginning: false,
   });
 
@@ -23,11 +47,8 @@ export async function startConsumer() {
 
       const { outboxId } = JSON.parse(message.value.toString());
 
-      // Phase 5.2 ends HERE
-      // Phase 5.3 will start from here
       console.log("Received outboxId:", outboxId);
-      await handleOutboxJob(outboxId)
-
+      await handleOutboxJob(outboxId);
     },
   });
 }
