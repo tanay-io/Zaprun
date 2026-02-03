@@ -1,4 +1,5 @@
 import { Kafka } from "kafkajs";
+import { handleOutboxJob } from "../workers/handleOutboxJob";
 
 const kafka = new Kafka({
   clientId: "zap-run-worker",
@@ -25,9 +26,8 @@ export async function startConsumer() {
       // Phase 5.2 ends HERE
       // Phase 5.3 will start from here
       console.log("Received outboxId:", outboxId);
+      await handleOutboxJob(outboxId)
 
-      // next phase:
-      // await handleOutboxJob(outboxId);
     },
   });
 }

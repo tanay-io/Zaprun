@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../../db/prisma";
+import { publishOutbox } from "../../kafka/producer";
 
 const router = Router();
 router.post("/webhook/:zapId", async (req, res) => {
@@ -21,13 +22,17 @@ router.post("/webhook/:zapId", async (req, res) => {
       triggerPayload: payload,
     },
   });
-  await prisma.zapRunOutbox.create({
+  const outbox = await prisma.zapRunOutbox.create({
     data: {
       zapRunId: zapRun.id,
-      stepIndex:0,
+      stepIndex: 0,
       status: "pending",
     },
   });
+
+  await publishOutbox(outbox.id);
+
   return res.status(200).json({ success: true });
 });
+
 export default router;
