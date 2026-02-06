@@ -11,6 +11,7 @@ export async function handleOutboxJob(outboxId: string) {
   /**
    * STEP 1 — CLAIM OUTBOX JOB
    */
+  const MAX_RETRIES = 3;
   const claimed = await claimOutboxJob(outboxId);
   if (!claimed) return;
 
@@ -141,10 +142,7 @@ export async function handleOutboxJob(outboxId: string) {
     });
 
     if (nextAction) {
-      const nextOutbox = await enqueueNextJob(
-        zapRun.id,
-        outbox.stepIndex,
-      );
+      const nextOutbox = await enqueueNextJob(zapRun.id, outbox.stepIndex);
       await publishOutbox(nextOutbox.id);
     } else {
       await prisma.zapRun.update({
@@ -171,7 +169,28 @@ export async function handleOutboxJob(outboxId: string) {
     /**
      * STEP 8B — FAILURE PATH
      */
+    const shouldRetry =
+      result.error?.retriable === true && outbox.attempt < MAX_RETRIES;
+
+    if (shouldRetry) {
+      await failJob(outbox.id);
+
+      const retryOutbox = await prisma.zapRunOutbox.create({
+        data: {
+          zapRunId: outbox.zapRunId,
+          stepIndex: outbox.stepIndex,
+          attempt: outbox.attempt + 1,
+          status: "pending",
+        },
+      });
+
+      await publishOutbox(retryOutbox.id);
+
+      return;
+    }
+
     await failJob(outbox.id);
+
     await prisma.zapRun.update({
       where: { id: zapRun.id },
       data: {
