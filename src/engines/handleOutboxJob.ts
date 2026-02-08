@@ -6,6 +6,7 @@ import { enqueueNextJob } from "../outbox/enqueue";
 import { executorRegistry } from "../executors";
 import { interpolateConfig } from "../utils/interpolate";
 import { publishOutbox } from "../kafka/producer";
+import { handleSystemWait } from "./systemWait";
 
 export async function handleOutboxJob(outboxId: string) {
   /**
@@ -53,8 +54,6 @@ export async function handleOutboxJob(outboxId: string) {
       availableAction: true,
     },
   });
-
-  // No step → workflow finished
   if (!action) {
     await completeJob(outbox.id);
     await prisma.zapRun.update({
@@ -64,6 +63,18 @@ export async function handleOutboxJob(outboxId: string) {
         finishedAt: new Date(),
       },
     });
+    return;
+  }
+
+  if (action.availableAction.key === "system.wait") {
+    const durationMs = (action.config as Record<string, unknown>).durationMs;
+
+    if (typeof durationMs !== "number") {
+      throw new Error("system.wait requires durationMs");
+    }
+
+    await handleSystemWait(zapRun.id, outbox.id, outbox.stepIndex, durationMs);
+
     return;
   }
 

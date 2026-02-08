@@ -1,5 +1,5 @@
 import { Kafka } from "kafkajs";
-import { handleOutboxJob } from "../workers/handleOutboxJob";
+import { handleOutboxJob } from "../engines/handleOutboxJob";
 
 const brokers = process.env.KAFKA_BROKERS?.split(",") ?? ["localhost:9092"];
 const OUTBOX_TOPIC = process.env.OUTBOX_TOPIC ?? "zaprun-outbox";
