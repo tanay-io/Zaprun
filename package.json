@@ -20,6 +20,7 @@
     "@prisma/adapter-pg": "6.19.2",
     "@prisma/client": "6.19.2",
     "axios": "^1.13.2",
+    "crypto": "^1.0.1",
     "express": "^5.2.1",
     "kafkajs": "^2.2.4",
     "pg": "^8.16.3",

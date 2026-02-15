@@ -15,9 +15,15 @@ router.post("/webhook/:zapId", async (req, res) => {
   if (!zap || zap.status !== "active") {
     return res.status(404).json({ message: "Zap not found or inactive" });
   }
+  if (!zap.latestVersionId) {
+    return res
+      .status(400)
+      .json({ message: "Zap has no latest version" });
+  }
   const zapRun = await prisma.zapRun.create({
     data: {
       zapId: zap.id,
+      zapVersionId: zap.latestVersionId,
       status: "pending",
       triggerPayload: payload,
     },

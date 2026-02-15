@@ -29,8 +29,15 @@ export async function handleOutboxJob(outboxId: string) {
    */
   const zapRun = await prisma.zapRun.findUnique({
     where: { id: outbox.zapRunId },
+    include: {
+      zapVersion: {
+        include: {
+          steps: true,
+        },
+      },
+    },
   });
-  if (!zapRun) return;
+  if (!zapRun || !zapRun.zapVersion) return;
 
   /**
    * STEP 4 — MARK ZAPRUN AS RUNNING (ONLY ON FIRST STEP)
@@ -45,16 +52,10 @@ export async function handleOutboxJob(outboxId: string) {
   /**
    * STEP 5 — LOAD STEP DEFINITION
    */
-  const action = await prisma.zapAction.findFirst({
-    where: {
-      zapId: zapRun.zapId,
-      stepOrder: outbox.stepIndex,
-    },
-    include: {
-      availableAction: true,
-    },
-  });
-  if (!action) {
+  const step = zapRun.zapVersion.steps.find(
+    (s) => s.stepIndex === outbox.stepIndex,
+  );
+  if (!step) {
     await completeJob(outbox.id);
     await prisma.zapRun.update({
       where: { id: zapRun.id },
@@ -66,8 +67,8 @@ export async function handleOutboxJob(outboxId: string) {
     return;
   }
 
-  if (action.availableAction.key === "system.wait") {
-    const durationMs = (action.config as Record<string, unknown>).durationMs;
+  if (step.actionKey === "system.wait") {
+    const durationMs = (step.config as Record<string, unknown>).durationMs;
 
     if (typeof durationMs !== "number") {
       throw new Error("system.wait requires durationMs");
@@ -81,17 +82,17 @@ export async function handleOutboxJob(outboxId: string) {
   /**
    * STEP 6 — RESOLVE EXECUTOR + INTERPOLATE CONFIG
    */
-  const executor = executorRegistry[action.availableAction.key];
+  const executor = executorRegistry[step.actionKey];
   if (!executor) {
     await failJob(outbox.id);
     await prisma.zapRun.update({
       where: { id: zapRun.id },
       data: {
         status: "failed",
-        failedStepId: action.id,
+        failedStepId: step.id,
         error: {
           code: "EXECUTOR_NOT_FOUND",
-          message: `Executor not found for ${action.availableAction.key}`,
+          message: `Executor not found for ${step.actionKey}`,
           retriable: false,
         },
         finishedAt: new Date(),
@@ -113,7 +114,7 @@ export async function handleOutboxJob(outboxId: string) {
     steps[`step${state.stepIndex}`] = state.output;
   }
 
-  const resolvedConfig = interpolateConfig(action.config, {
+  const resolvedConfig = interpolateConfig(step.config, {
     trigger: zapRun.triggerPayload,
     steps,
   });
@@ -145,14 +146,12 @@ export async function handleOutboxJob(outboxId: string) {
      */
     await completeJob(outbox.id);
 
-    const nextAction = await prisma.zapAction.findFirst({
-      where: {
-        zapId: zapRun.zapId,
-        stepOrder: outbox.stepIndex + 1,
-      },
-    });
+    const nextStepIndex = outbox.stepIndex + 1;
+    const nextStep = zapRun.zapVersion.steps.find(
+      (s) => s.stepIndex === nextStepIndex,
+    );
 
-    if (nextAction) {
+    if (nextStep) {
       const nextOutbox = await enqueueNextJob(zapRun.id, outbox.stepIndex);
       await publishOutbox(nextOutbox.id);
     } else {
@@ -206,7 +205,7 @@ export async function handleOutboxJob(outboxId: string) {
       where: { id: zapRun.id },
       data: {
         status: "failed",
-        failedStepId: action.id,
+        failedStepId: step.id,
         error: result.error,
         finishedAt: new Date(),
       },
