@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const webhook_1 = __importDefault(require("./routes/webhook"));
-const debug_1 = __importDefault(require("./routes/debug"));
+const zaps_1 = __importDefault(require("./routes/zaps"));
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
 app.get("/health", (req, res) => {
@@ -14,5 +14,5 @@ app.get("/health", (req, res) => {
 });
 app.use(express_1.default.json());
 app.use(webhook_1.default);
-app.use(debug_1.default);
+app.use(zaps_1.default);
 exports.default = app;

@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startConsumer = startConsumer;
 const kafkajs_1 = require("kafkajs");
-const handleOutboxJob_1 = require("../workers/handleOutboxJob");
+const handleOutboxJob_1 = require("../engines/handleOutboxJob");
 const brokers = process.env.KAFKA_BROKERS?.split(",") ?? ["localhost:9092"];
 const OUTBOX_TOPIC = process.env.OUTBOX_TOPIC ?? "zaprun-outbox";
 const kafka = new kafkajs_1.Kafka({

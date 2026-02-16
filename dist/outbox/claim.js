@@ -9,7 +9,14 @@ async function claimOutboxJob(outboxJobId, lockMs = 60000) {
         where: {
             id: outboxJobId,
             status: "pending",
-            OR: [{ lockedUntil: null }, { lockedUntil: { lt: now } }],
+            AND: [
+                {
+                    OR: [{ resumeAt: null }, { resumeAt: { lte: now } }],
+                },
+                {
+                    OR: [{ lockedUntil: null }, { lockedUntil: { lt: now } }],
+                },
+            ],
         },
         data: {
             status: "processing",
