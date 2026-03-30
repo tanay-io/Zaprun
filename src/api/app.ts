@@ -1,15 +1,17 @@
 import express from "express";
 import webhookRouter from "./routes/webhook";
 import zapsRouter from "./routes/zaps";
+import zapRunsRouter from "./routes/zapRuns";
+import { logger } from "../utils/logger";
 
 const app = express();
 app.use(express.json());
 
 app.get("/health", (req, res) => {
-  console.log("Hi there");
+  logger.debug("Health check hit");
   res.json({ ok: true });
 });
-app.use(express.json());
 app.use(webhookRouter);
 app.use(zapsRouter);
+app.use(zapRunsRouter);
 export default app;

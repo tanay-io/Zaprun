@@ -3,7 +3,7 @@ import { claimOutboxJob } from "../outbox/claim";
 import { completeJob } from "../outbox/complete";
 import { failJob } from "../outbox/fail";
 import { enqueueNextJob } from "../outbox/enqueue";
-import { executorRegistry } from "../executors";
+import { getExecutor } from "./pluginRegistry";
 import { interpolateConfig } from "../utils/interpolate";
 import { publishOutbox } from "../kafka/producer";
 import { handleSystemWait } from "./systemWait";
@@ -82,7 +82,7 @@ export async function handleOutboxJob(outboxId: string) {
   /**
    * STEP 6 — RESOLVE EXECUTOR + INTERPOLATE CONFIG
    */
-  const executor = executorRegistry[step.actionKey];
+  const executor = getExecutor(step.actionKey);
   if (!executor) {
     await failJob(outbox.id);
     await prisma.zapRun.update({

@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  zaps Zap[]
+  connections Connection[]
+}
+
+model Zap {
+  id              String      @id @default(cuid())
+  name            String
+  status          ZapStatus
+  latestVersionId String?     @unique
+  latestVersion   ZapVersion? @relation("LatestVersion", fields: [latestVersionId], references: [id])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  versions ZapVersion[] @relation("AllVersions")
+  actions  ZapAction[]
+  runs     ZapRun[]
+  trigger  ZapTrigger?
+}
+
+model ZapVersion {
+  id            String           @id @default(cuid())
+  zapId         String
+  versionNumber Int
+  zap           Zap              @relation("AllVersions", fields: [zapId], references: [id])
+  latestFor     Zap?             @relation("LatestVersion")
+  steps         ZapVersionStep[]
+  createdAt     DateTime         @default(now())
+  zapRuns       ZapRun[]
+
+  @@unique([zapId, versionNumber])
+}
+
+model ZapVersionStep {
+  id                 String  @id @default(cuid())
+  zapVersionId       String
+  stepIndex          Int
+  actionKey          String
+  config             Json
+  inputSchema        Json
+  outputSchema       Json
+  stepDefinitionHash String?
+
+  zapVersion ZapVersion @relation(fields: [zapVersionId], references: [id])
+
+  @@unique([zapVersionId, stepIndex])
+}
+
+model AvailableTrigger {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  schema    Json
+  createdAt DateTime @default(now())
+  availableProviderId String?
+
+  availableProvider AvailableProvider? @relation(fields: [availableProviderId], references: [id])
+
+  zapTriggers ZapTrigger[]
+}
+
+model ZapTrigger {
+  id                 String @id @default(cuid())
+  zapId              String @unique
+  availableTriggerId String
+  config             Json
+
+  availableTrigger AvailableTrigger @relation(fields: [availableTriggerId], references: [id])
+  zap              Zap              @relation(fields: [zapId], references: [id])
+}
+
+model AvailableAction {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  schema    Json
+  createdAt DateTime @default(now())
+  availableProviderId String?
+
+  availableProvider AvailableProvider? @relation(fields: [availableProviderId], references: [id])
+
+  zapActions ZapAction[]
+}
+
+model AvailableProvider {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  name          String
+  description   String   @default("")
+  iconUrl       String?
+  docsUrl       String?
+  authTypes     String[]
+  authConfig    Json?
+  rateLimitHint Json?
+  version       String   @default("1.0.0")
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  triggers AvailableTrigger[]
+  actions  AvailableAction[]
+}
+
+model ZapAction {
+  id                String @id @default(cuid())
+  zapId             String
+  availableActionId String
+  stepOrder         Int
+  config            Json
+
+  availableAction AvailableAction @relation(fields: [availableActionId], references: [id])
+  zap             Zap             @relation(fields: [zapId], references: [id])
+}
+
+model ZapRun {
+  id String @id @default(cuid())
+
+  zapId        String
+  zapVersionId String
+
+  triggerPayload Json
+
+  status ZapRunStatus
+
+  failedStepId String?
+  error        Json?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  zap        Zap        @relation(fields: [zapId], references: [id])
+  zapVersion ZapVersion @relation(fields: [zapVersionId], references: [id])
+
+  outbox     ZapRunOutbox[]
+  stepStates StepState[]
+}
+
+model ZapRunOutbox {
+  id          String       @id @default(cuid())
+  zapRunId    String
+  payload     Json?
+  stepIndex   Int          @default(0)
+  status      OutboxStatus
+  attempt     Int          @default(0)
+  createdAt   DateTime     @default(now())
+  lockedUntil DateTime?
+  resumeAt    DateTime?
+
+  zapRun ZapRun @relation(fields: [zapRunId], references: [id])
+}
+
+model StepState {
+  id String @id @default(cuid())
+
+  zapRunId  String
+  stepIndex Int
+  attempt   Int
+
+  status StepExecutionStatus
+  output Json?
+  error  Json?
+  idempotencyKey String? @unique
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  zapRun ZapRun @relation(fields: [zapRunId], references: [id])
+
+  @@unique([zapRunId, stepIndex, attempt])
+}
+
+enum StepExecutionStatus {
+  success
+  error
+}
+
+enum ZapStatus {
+  active
+  paused
+}
+
+enum ZapRunStatus {
+  pending
+  running
+  success
+  failed
+}
+
+enum OutboxStatus {
+  pending
+  completed
+  failed
+  processing
+}
+
+model Connection {
+  id        String   @id @default(cuid())
+  userId    String
+  provider  String
+  authType  String
+  authData  String   // encrypted payload
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}

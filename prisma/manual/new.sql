@@ -1,0 +1,1 @@
+CREATE INDEX "idx_outbox_sweeper" ON "ZapRunOutbox"("status", "resumeAt")

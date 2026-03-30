@@ -1,5 +1,6 @@
 import { Kafka } from "kafkajs";
 import { handleOutboxJob } from "../engines/handleOutboxJob";
+import { logger } from "../utils/logger";
 
 const brokers = process.env.KAFKA_BROKERS?.split(",") ?? ["localhost:9092"];
 const OUTBOX_TOPIC = process.env.OUTBOX_TOPIC ?? "zaprun-outbox";
@@ -47,7 +48,7 @@ export async function startConsumer() {
 
       const { outboxId } = JSON.parse(message.value.toString());
 
-      console.log("Received outboxId:", outboxId);
+      logger.info({ outboxId }, "Received outbox job");
       await handleOutboxJob(outboxId);
     },
   });
