@@ -7,6 +7,7 @@ import { getExecutor } from "./pluginRegistry";
 import { interpolateConfig } from "../utils/interpolate";
 import { publishOutbox } from "../kafka/producer";
 import { handleSystemWait } from "./systemWait";
+import { validateStepConfig } from "../utils/validateStepConfig";
 
 export async function handleOutboxJob(outboxId: string) {
   /**
@@ -118,6 +119,46 @@ export async function handleOutboxJob(outboxId: string) {
     trigger: zapRun.triggerPayload,
     steps,
   });
+
+  /**
+   * STEP 6.5 — VALIDATE INTERPOLATED CONFIG AGAINST MANIFEST SCHEMA
+   */
+  const validation = validateStepConfig(step.actionKey, resolvedConfig);
+  if (!validation.valid) {  
+    await failJob(outbox.id);
+
+    await prisma.stepState.create({
+      data: {
+        zapRunId: zapRun.id,
+        stepIndex: outbox.stepIndex,
+        attempt: outbox.attempt,
+        status: "error",
+        error: {
+          code: "VALIDATION_FAILED",
+          message: "Interpolated config failed schema validation",
+          errors: validation.errors,
+        },
+        startedAt: new Date(),
+        finishedAt: new Date(),
+      },
+    });
+
+    await prisma.zapRun.update({
+      where: { id: zapRun.id },
+      data: {
+        status: "failed",
+        failedStepId: step.id,
+        error: {
+          code: "VALIDATION_FAILED",
+          message: "Interpolated config failed schema validation",
+          errors: validation.errors,
+          retriable: false,
+        },
+        finishedAt: new Date(),
+      },
+    });
+    return;
+  }
 
   /**
    * STEP 7 — EXECUTE STEP + WRITE STEPSTATE

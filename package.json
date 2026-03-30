@@ -19,6 +19,8 @@
   "dependencies": {
     "@prisma/adapter-pg": "6.19.2",
     "@prisma/client": "6.19.2",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
     "axios": "^1.13.2",
     "crypto": "^1.0.1",
     "express": "^5.2.1",

@@ -2,6 +2,7 @@ import express from "express";
 import webhookRouter from "./routes/webhook";
 import zapsRouter from "./routes/zaps";
 import zapRunsRouter from "./routes/zapRuns";
+import providersRouter from "./routes/providers";
 import { logger } from "../utils/logger";
 
 const app = express();
@@ -14,4 +15,5 @@ app.get("/health", (req, res) => {
 app.use(webhookRouter);
 app.use(zapsRouter);
 app.use(zapRunsRouter);
+app.use(providersRouter);
 export default app;

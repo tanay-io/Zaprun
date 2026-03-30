@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { ProviderManifest } from "../types/manifest";
+import { ProviderManifest, ActionManifest } from "../types/manifest";
 import { Executor } from "../executors/types";
 import { logger } from "../utils/logger";
 
@@ -12,6 +12,9 @@ type RegisteredPlugin = {
 const registry = new Map<string, RegisteredPlugin>();
 
 const executorIndex = new Map<string, Executor>();
+
+const actionManifestIndex = new Map<string, ActionManifest>();
+
 export async function loadPlugins(): Promise<void> {
   const pluginsDir = path.resolve(__dirname, "..", "plugins");
 
@@ -44,6 +47,7 @@ export async function loadPlugins(): Promise<void> {
       for (const action of manifest.actions) {
         executors[action.key] = execute;
         executorIndex.set(action.key, execute);
+        actionManifestIndex.set(action.key, action);
       }
 
       registry.set(manifest.key, { manifest, executors });
@@ -74,6 +78,12 @@ export function getExecutor(actionKey: string): Executor | undefined {
 export function getManifest(providerKey: string): ProviderManifest | undefined {
   return registry.get(providerKey)?.manifest;
 }
+
+export function getActionManifest(actionKey: string): ActionManifest | undefined {
+  return actionManifestIndex.get(actionKey);
+}
+
 export function getAllManifests(): ProviderManifest[] {
   return Array.from(registry.values()).map((r) => r.manifest);
 }
+

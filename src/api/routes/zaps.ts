@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { buildNewVersionFromActions } from "../../services/versionBuilder";
+import { validateStepConfig } from "../../utils/validateStepConfig";
 
 const router = Router();
 
@@ -49,6 +50,36 @@ router.post("/zaps", async (req, res) => {
     });
   }
 
+  // --- AJV Validation: validate each action's config against its manifest inputSchema ---
+  const actionIds = body.actions.map((a) => a.availableActionId);
+  const dbActions = await prisma.availableAction.findMany({
+    where: { id: { in: actionIds } },
+    select: { id: true, key: true },
+  });
+
+  const idToKey = new Map(dbActions.map((a) => [a.id, a.key]));
+
+  const validationErrors: { step: number; actionKey: string; errors: { field: string; message: string }[] }[] = [];
+
+  for (let i = 0; i < body.actions.length; i++) {
+    const action = body.actions[i];
+    const actionKey = idToKey.get(action.availableActionId);
+
+    if (!actionKey) continue; // unknown action ID — will fail at DB insert anyway
+
+    const result = validateStepConfig(actionKey, action.config);
+    if (!result.valid) {
+      validationErrors.push({ step: i, actionKey, errors: result.errors });
+    }
+  }
+
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      message: "Action config validation failed",
+      validationErrors,
+    });
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const zap = await tx.zap.create({
       data: {
@@ -89,6 +120,37 @@ router.put("/zaps/:zapId", async (req, res) => {
   const existing = await prisma.zap.findUnique({ where: { id: zapId } });
   if (!existing) {
     return res.status(404).json({ message: "Zap not found" });
+  }
+
+  // --- AJV Validation on update (only when actions are provided) ---
+  if (body.actions && body.actions.length > 0) {
+    const actionIds = body.actions.map((a) => a.availableActionId);
+    const dbActions = await prisma.availableAction.findMany({
+      where: { id: { in: actionIds } },
+      select: { id: true, key: true },
+    });
+
+    const idToKey = new Map(dbActions.map((a) => [a.id, a.key]));
+
+    const validationErrors: { step: number; actionKey: string; errors: { field: string; message: string }[] }[] = [];
+
+    for (let i = 0; i < body.actions.length; i++) {
+      const action = body.actions[i];
+      const actionKey = idToKey.get(action.availableActionId);
+      if (!actionKey) continue;
+
+      const result = validateStepConfig(actionKey, action.config);
+      if (!result.valid) {
+        validationErrors.push({ step: i, actionKey, errors: result.errors });
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        message: "Action config validation failed",
+        validationErrors,
+      });
+    }
   }
 
   const result = await prisma.$transaction(async (tx) => {
