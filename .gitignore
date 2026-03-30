@@ -5,7 +5,7 @@ node_modules/
 !.env.example
 
 /dist/
-
+/postman/
 *.log
 *.db
 *.sqlite
@@ -17,3 +17,5 @@ context.md
 LEARNING_NOTES.md
 PROJECT_CONTEXT.md
 /docs/
+new.sql
+phase5.txt
