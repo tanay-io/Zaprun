@@ -15,6 +15,7 @@ model User {
 
   zaps Zap[]
   connections Connection[]
+  oauthSessions OauthSession[]
 }
 
 model Zap {
@@ -216,9 +217,30 @@ model Connection {
   provider  String
   authType  String
   authData  String   // encrypted payload
+  scopes    String[] @default([])
+  tokenEndpoint         String?
+  authorizationEndpoint String?
+  expiresAt             DateTime?
+  refreshToken          String?  // encrypted payload
   status    String   @default("active")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model OauthSession {
+  id           String   @id @default(cuid())
+  state        String   @unique
+  provider     String
+  userId       String
+  codeVerifier String   // encrypted code_verifier
+  redirectUri  String
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([expiresAt])
 }
