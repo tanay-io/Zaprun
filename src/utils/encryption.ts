@@ -24,7 +24,10 @@ export function encryptString(value: string): string {
   const key = getEncryptionKey();
 
   const cipher = crypto.createCipheriv(AES_256_GCM, key, iv);
-  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(value, "utf8"),
+    cipher.final(),
+  ]);
   const authTag = cipher.getAuthTag();
 
   return Buffer.concat([iv, authTag, encrypted]).toString("base64");
@@ -45,6 +48,9 @@ export function decryptString(payload: string): string {
   const decipher = crypto.createDecipheriv(AES_256_GCM, key, iv);
   decipher.setAuthTag(authTag);
 
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+  const decrypted = Buffer.concat([
+    decipher.update(encrypted),
+    decipher.final(),
+  ]);
   return decrypted.toString("utf8");
 }
