@@ -1,14 +1,11 @@
 import axios from "axios";
-import {
-  ExecutorContext,
-  ExecutionResult,
-} from "../../executors/types";
-
+import { Connection } from "@prisma/client";
+import { ExecutorContext, ExecutionResult } from "../../executors/types";
 
 export async function execute(ctx: ExecutorContext): Promise<ExecutionResult> {
   const start = Date.now();
   const { config } = ctx;
-  const { method, url, headers, body } = config;
+  const { method, url, headers, body, queryParams } = config;
 
   if (!method || !url) {
     return {
@@ -26,6 +23,7 @@ export async function execute(ctx: ExecutorContext): Promise<ExecutionResult> {
       method,
       url,
       headers,
+      params: queryParams,
       data: body,
       validateStatus: () => true,
     });
@@ -87,4 +85,10 @@ export async function execute(ctx: ExecutorContext): Promise<ExecutionResult> {
       },
     };
   }
+}
+
+export async function testConnection(
+  connection: Connection,
+): Promise<{ healthy: boolean }> {
+  return { healthy: connection.status === "active" };
 }

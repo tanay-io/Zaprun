@@ -16,11 +16,17 @@ export const logger = pino({
       },
   redact: {
     paths: [
+      "authData",
       "connection.authData",
+      "accessToken",
       "*.accessToken",
+      "refreshToken",
       "*.refreshToken",
+      "clientSecret",
       "*.clientSecret",
+      "authorization",
       "*.authorization",
+      "apiKey",
       "*.apiKey",
     ],
     censor: "[REDACTED]",

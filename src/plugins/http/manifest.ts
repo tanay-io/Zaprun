@@ -42,6 +42,11 @@ export const httpManifest: ProviderManifest = {
             additionalProperties: { type: "string" },
             description: "Request headers",
           },
+          queryParams: {
+            type: "object",
+            additionalProperties: { type: "string" },
+            description: "Query params appended to URL",
+          },
           body: {
             description: "Request body (for POST/PUT/PATCH)",
           },

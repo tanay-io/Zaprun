@@ -3,7 +3,8 @@ import webhookRouter from "./routes/webhook";
 import zapsRouter from "./routes/zaps";
 import zapRunsRouter from "./routes/zapRuns";
 import providersRouter from "./routes/providers";
-import authRouter from "./routes/auth";
+import authRouter from "./routes/oauth/auth";
+import connectionsRouter from "./routes/apiKeys/connections";
 import { logger } from "../utils/logger";
 
 const app = express();
@@ -18,4 +19,5 @@ app.use(zapsRouter);
 app.use(zapRunsRouter);
 app.use(providersRouter);
 app.use(authRouter);
+app.use(connectionsRouter);
 export default app;

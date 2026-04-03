@@ -2,43 +2,25 @@ import { Router, Request } from "express";
 import axios from "axios";
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
-import { prisma } from "../../db/prisma";
-import { getManifest } from "../../engines/pluginRegistry";
-import { OAuth2AuthConfig } from "../../types/manifest";
-import { logger } from "../../utils/logger";
-import { decryptString, encryptString } from "../../utils/encryption";
+import { prisma } from "../../../db/prisma";
+import {
+  getOAuthConfig,
+  getProviderOAuthEnvironment,
+  parseScopes,
+  parseTokenResponse,
+  providerEnvPrefix,
+  toExpiresAt,
+  toOptionalString,
+} from "../../../auth/resolvers/oauth2";
+import { logger } from "../../../utils/logger";
+import { decryptString, encryptString } from "../../../utils/encryption";
 
 const router = Router();
 
 const AUTH_SESSION_TTL_MS = 10 * 60 * 1000;
 
-type ProviderOAuthEnvironment = {
-  clientId: string;
-  clientSecret?: string;
-  redirectUri?: string;
-};
-
 function getQueryString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
-}
-
-function providerEnvPrefix(providerKey: string): string {
-  return providerKey.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase();
-}
-
-function getProviderOAuthEnvironment(providerKey: string): ProviderOAuthEnvironment | null {
-  const prefix = providerEnvPrefix(providerKey);
-
-  const clientId = process.env[`${prefix}_CLIENT_ID`];
-  if (!clientId) {
-    return null;
-  }
-
-  return {
-    clientId,
-    clientSecret: process.env[`${prefix}_CLIENT_SECRET`],
-    redirectUri: process.env[`${prefix}_REDIRECT_URI`],
-  };
 }
 
 function base64UrlEncode(input: Buffer): string {
@@ -58,19 +40,6 @@ function generateCodeChallenge(codeVerifier: string): string {
   return base64UrlEncode(digest);
 }
 
-function resolveOAuthConfig(providerKey: string): OAuth2AuthConfig | null {
-  const manifest = getManifest(providerKey);
-  if (!manifest || manifest.authType !== "oauth2") {
-    return null;
-  }
-
-  if (manifest.authConfig.type !== "oauth2") {
-    return null;
-  }
-
-  return manifest.authConfig;
-}
-
 function resolveUserId(req: Request): string | null {
   const headerUserId = req.header("x-user-id");
   if (headerUserId) {
@@ -80,70 +49,9 @@ function resolveUserId(req: Request): string | null {
   return getQueryString(req.query.userId);
 }
 
-function toRecord(value: unknown): Record<string, unknown> {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
-}
-
-function parseTokenResponse(data: unknown): Record<string, unknown> {
-  if (typeof data === "string") {
-    const parsed = new URLSearchParams(data);
-    const out: Record<string, unknown> = {};
-
-    for (const [key, value] of parsed.entries()) {
-      out[key] = value;
-    }
-
-    return out;
-  }
-
-  return toRecord(data);
-}
-
-function toOptionalString(value: unknown): string | null {
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-
-  if (typeof value === "number") {
-    return String(value);
-  }
-
-  return null;
-}
-
-function toExpiresAt(expiresInRaw: unknown): Date | null {
-  const expiresIn = toOptionalString(expiresInRaw);
-  if (!expiresIn) {
-    return null;
-  }
-
-  const expiresInSeconds = Number(expiresIn);
-  if (!Number.isFinite(expiresInSeconds) || expiresInSeconds <= 0) {
-    return null;
-  }
-
-  return new Date(Date.now() + expiresInSeconds * 1000);
-}
-
-function parseScopes(scopeRaw: unknown, fallbackScopes: string[]): string[] {
-  const scope = toOptionalString(scopeRaw);
-  if (!scope) {
-    return fallbackScopes;
-  }
-
-  return scope
-    .split(/[\s,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 router.get("/auth/:providerKey/start", async (req, res) => {
   const providerKey = req.params.providerKey;
-  const oauthConfig = resolveOAuthConfig(providerKey);
+  const oauthConfig = getOAuthConfig(providerKey);
 
   if (!oauthConfig) {
     return res.status(404).json({
@@ -152,7 +60,7 @@ router.get("/auth/:providerKey/start", async (req, res) => {
   }
 
   const providerEnv = getProviderOAuthEnvironment(providerKey);
-  if (!providerEnv?.redirectUri) {
+  if (!providerEnv.clientId || !providerEnv.redirectUri) {
     const prefix = providerEnvPrefix(providerKey);
     return res.status(500).json({
       message: `Missing OAuth environment for provider '${providerKey}'. Expected ${prefix}_CLIENT_ID and ${prefix}_REDIRECT_URI.`,
@@ -162,7 +70,8 @@ router.get("/auth/:providerKey/start", async (req, res) => {
   const userId = resolveUserId(req);
   if (!userId) {
     return res.status(400).json({
-      message: "Missing user identity. Provide x-user-id header or userId query param.",
+      message:
+        "Missing user identity. Provide x-user-id header or userId query param.",
     });
   }
 
@@ -205,7 +114,7 @@ router.get("/auth/:providerKey/start", async (req, res) => {
 
 router.get("/auth/:providerKey/callback", async (req, res) => {
   const providerKey = req.params.providerKey;
-  const oauthConfig = resolveOAuthConfig(providerKey);
+  const oauthConfig = getOAuthConfig(providerKey);
 
   if (!oauthConfig) {
     return res.status(404).json({
@@ -230,7 +139,9 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
   }
 
   const now = new Date();
-  const oauthSession = await prisma.oauthSession.findUnique({ where: { state } });
+  const oauthSession = await prisma.oauthSession.findUnique({
+    where: { state },
+  });
 
   if (!oauthSession || oauthSession.provider !== providerKey) {
     return res.status(400).json({ message: "Invalid OAuth state" });
@@ -262,12 +173,15 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
   try {
     codeVerifier = decryptString(oauthSession.codeVerifier);
   } catch (error) {
-    logger.error({ err: error, providerKey }, "Failed to decrypt PKCE verifier");
+    logger.error(
+      { err: error, providerKey },
+      "Failed to decrypt PKCE verifier",
+    );
     return res.status(500).json({ message: "Invalid stored PKCE verifier" });
   }
 
   const providerEnv = getProviderOAuthEnvironment(providerKey);
-  if (!providerEnv) {
+  if (!providerEnv.clientId) {
     const prefix = providerEnvPrefix(providerKey);
     return res.status(500).json({
       message: `Missing OAuth environment for provider '${providerKey}'. Expected ${prefix}_CLIENT_ID.`,
@@ -286,11 +200,15 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
 
   let tokenPayload: Record<string, unknown>;
   try {
-    const tokenResponse = await axios.post(oauthConfig.tokenUrl, tokenRequestBody.toString(), {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+    const tokenResponse = await axios.post(
+      oauthConfig.tokenUrl,
+      tokenRequestBody.toString(),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       },
-    });
+    );
     tokenPayload = parseTokenResponse(tokenResponse.data);
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -306,7 +224,9 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
       logger.warn({ providerKey, err: error }, "OAuth token exchange failed");
     }
 
-    return res.status(502).json({ message: "Failed to exchange authorization code" });
+    return res
+      .status(502)
+      .json({ message: "Failed to exchange authorization code" });
   }
 
   const accessToken = toOptionalString(tokenPayload.access_token);
@@ -317,7 +237,9 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
   }
 
   const refreshTokenRaw = toOptionalString(tokenPayload.refresh_token);
-  const encryptedRefreshToken = refreshTokenRaw ? encryptString(refreshTokenRaw) : null;
+  const encryptedRefreshToken = refreshTokenRaw
+    ? encryptString(refreshTokenRaw)
+    : null;
   const expiresAt = toExpiresAt(tokenPayload.expires_in);
   const scopes = parseScopes(tokenPayload.scope, oauthConfig.scopes);
 
@@ -338,7 +260,8 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
     select: { id: true, refreshToken: true },
   });
 
-  const refreshTokenToStore = encryptedRefreshToken ?? existingConnection?.refreshToken ?? null;
+  const refreshTokenToStore =
+    encryptedRefreshToken ?? existingConnection?.refreshToken ?? null;
 
   const connectionData = {
     provider: providerKey,
@@ -357,7 +280,13 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
     connection = await prisma.connection.update({
       where: { id: existingConnection.id },
       data: connectionData,
-      select: { id: true, provider: true, scopes: true, expiresAt: true, status: true },
+      select: {
+        id: true,
+        provider: true,
+        scopes: true,
+        expiresAt: true,
+        status: true,
+      },
     });
   } else {
     connection = await prisma.connection.create({
@@ -365,7 +294,13 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
         userId: oauthSession.userId,
         ...connectionData,
       },
-      select: { id: true, provider: true, scopes: true, expiresAt: true, status: true },
+      select: {
+        id: true,
+        provider: true,
+        scopes: true,
+        expiresAt: true,
+        status: true,
+      },
     });
   }
 

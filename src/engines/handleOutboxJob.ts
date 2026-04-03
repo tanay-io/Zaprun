@@ -3,11 +3,13 @@ import { claimOutboxJob } from "../outbox/claim";
 import { completeJob } from "../outbox/complete";
 import { failJob } from "../outbox/fail";
 import { enqueueNextJob } from "../outbox/enqueue";
-import { getExecutor } from "./pluginRegistry";
+import { getActionManifest, getExecutor } from "./pluginRegistry";
 import { interpolateConfig } from "../utils/interpolate";
 import { publishOutbox } from "../kafka/producer";
 import { handleSystemWait } from "./systemWait";
 import { validateStepConfig } from "../utils/validateStepConfig";
+import { getConnection } from "../auth/resolvers/oauth2";
+import { resolveConnectionAuth } from "../auth/services/connectionAuth";
 
 export async function handleOutboxJob(outboxId: string) {
   /**
@@ -31,6 +33,11 @@ export async function handleOutboxJob(outboxId: string) {
   const zapRun = await prisma.zapRun.findUnique({
     where: { id: outbox.zapRunId },
     include: {
+      zap: {
+        select: {
+          userId: true,
+        },
+      },
       zapVersion: {
         include: {
           steps: true,
@@ -124,7 +131,7 @@ export async function handleOutboxJob(outboxId: string) {
    * STEP 6.5 — VALIDATE INTERPOLATED CONFIG AGAINST MANIFEST SCHEMA
    */
   const validation = validateStepConfig(step.actionKey, resolvedConfig);
-  if (!validation.valid) {  
+  if (!validation.valid) {
     await failJob(outbox.id);
 
     await prisma.stepState.create({
@@ -158,6 +165,116 @@ export async function handleOutboxJob(outboxId: string) {
       },
     });
     return;
+  }
+
+  /**
+   * STEP 6.75 — RESOLVE/REFRESH CONNECTION AUTH IF STEP NEEDS ONE
+   */
+  const actionManifest = getActionManifest(step.actionKey);
+  if (actionManifest?.requiresConnection) {
+    const failWithConnectionError = async (code: string, message: string) => {
+      await failJob(outbox.id);
+
+      await prisma.stepState.create({
+        data: {
+          zapRunId: zapRun.id,
+          stepIndex: outbox.stepIndex,
+          attempt: outbox.attempt,
+          status: "error",
+          error: {
+            code,
+            message,
+            retriable: false,
+          },
+          startedAt: new Date(),
+          finishedAt: new Date(),
+        },
+      });
+
+      await prisma.zapRun.update({
+        where: { id: zapRun.id },
+        data: {
+          status: "failed",
+          failedStepId: step.id,
+          error: {
+            code,
+            message,
+            retriable: false,
+          },
+          finishedAt: new Date(),
+        },
+      });
+    };
+
+    const configRecord =
+      resolvedConfig &&
+      typeof resolvedConfig === "object" &&
+      !Array.isArray(resolvedConfig)
+        ? (resolvedConfig as Record<string, unknown>)
+        : null;
+
+    const connectionId =
+      configRecord && typeof configRecord.connectionId === "string"
+        ? configRecord.connectionId
+        : null;
+
+    if (!connectionId) {
+      await failWithConnectionError(
+        "CONNECTION_INVALID",
+        "connectionId is required for step requiring connection",
+      );
+      return;
+    }
+
+    let connection = await getConnection(connectionId, zapRun.zap.userId);
+    if (!connection || connection.status !== "active") {
+      await failWithConnectionError(
+        "CONNECTION_INVALID",
+        "Connection is missing or inactive",
+      );
+      return;
+    }
+
+    try {
+      const resolvedAuth = await resolveConnectionAuth(connection);
+
+      const existingHeaders =
+        configRecord &&
+        configRecord.headers &&
+        typeof configRecord.headers === "object" &&
+        !Array.isArray(configRecord.headers)
+          ? (configRecord.headers as Record<string, unknown>)
+          : {};
+
+      configRecord!.headers = {
+        ...existingHeaders,
+        ...resolvedAuth.headers,
+      };
+
+      const hasAuthQueryParams =
+        Object.keys(resolvedAuth.queryParams).length > 0;
+
+      if (hasAuthQueryParams) {
+        const existingQueryParams =
+          configRecord &&
+          configRecord.queryParams &&
+          typeof configRecord.queryParams === "object" &&
+          !Array.isArray(configRecord.queryParams)
+            ? (configRecord.queryParams as Record<string, unknown>)
+            : {};
+
+        configRecord!.queryParams = {
+          ...existingQueryParams,
+          ...resolvedAuth.queryParams,
+        };
+      }
+    } catch {
+      await failWithConnectionError(
+        "CONNECTION_AUTH_FAILED",
+        "Failed to resolve connection auth. Reconnect provider and retry.",
+      );
+      return;
+    }
   }
 
   /**

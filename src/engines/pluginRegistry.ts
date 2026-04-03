@@ -1,12 +1,24 @@
 import * as fs from "fs";
 import * as path from "path";
+import { Connection } from "@prisma/client";
 import { ProviderManifest, ActionManifest } from "../types/manifest";
 import { Executor } from "../executors/types";
 import { logger } from "../utils/logger";
 
+export type ConnectionTestResult = {
+  healthy: boolean;
+  httpStatus?: number;
+  error?: string;
+};
+
+export type ConnectionTester = (
+  connection: Connection,
+) => Promise<ConnectionTestResult>;
+
 type RegisteredPlugin = {
   manifest: ProviderManifest;
   executors: Record<string, Executor>;
+  testConnection?: ConnectionTester;
 };
 
 const registry = new Map<string, RegisteredPlugin>();
@@ -15,11 +27,21 @@ const executorIndex = new Map<string, Executor>();
 
 const actionManifestIndex = new Map<string, ActionManifest>();
 
+const connectionTesterIndex = new Map<string, ConnectionTester>();
+
 export async function loadPlugins(): Promise<void> {
+  registry.clear();
+  executorIndex.clear();
+  actionManifestIndex.clear();
+  connectionTesterIndex.clear();
+
   const pluginsDir = path.resolve(__dirname, "..", "plugins");
 
   if (!fs.existsSync(pluginsDir)) {
-    logger.warn({ pluginsDir }, "Plugins directory not found — no plugins loaded");
+    logger.warn(
+      { pluginsDir },
+      "Plugins directory not found — no plugins loaded",
+    );
     return;
   }
 
@@ -33,6 +55,8 @@ export async function loadPlugins(): Promise<void> {
 
       const manifest: ProviderManifest | undefined = plugin.manifest;
       const execute: Executor | undefined = plugin.execute;
+      const testConnection: ConnectionTester | undefined =
+        plugin.testConnection;
 
       if (!manifest) {
         logger.warn({ plugin: dir.name }, "Plugin missing manifest — skipped");
@@ -50,7 +74,11 @@ export async function loadPlugins(): Promise<void> {
         actionManifestIndex.set(action.key, action);
       }
 
-      registry.set(manifest.key, { manifest, executors });
+      if (testConnection) {
+        connectionTesterIndex.set(manifest.key, testConnection);
+      }
+
+      registry.set(manifest.key, { manifest, executors, testConnection });
 
       logger.info(
         {
@@ -66,7 +94,10 @@ export async function loadPlugins(): Promise<void> {
   }
 
   logger.info(
-    { providers: Array.from(registry.keys()), totalActions: executorIndex.size },
+    {
+      providers: Array.from(registry.keys()),
+      totalActions: executorIndex.size,
+    },
     `Plugin registry ready — ${registry.size} provider(s), ${executorIndex.size} action(s)`,
   );
 }
@@ -79,7 +110,9 @@ export function getManifest(providerKey: string): ProviderManifest | undefined {
   return registry.get(providerKey)?.manifest;
 }
 
-export function getActionManifest(actionKey: string): ActionManifest | undefined {
+export function getActionManifest(
+  actionKey: string,
+): ActionManifest | undefined {
   return actionManifestIndex.get(actionKey);
 }
 
@@ -87,3 +120,8 @@ export function getAllManifests(): ProviderManifest[] {
   return Array.from(registry.values()).map((r) => r.manifest);
 }
 
+export function getConnectionTester(
+  providerKey: string,
+): ConnectionTester | undefined {
+  return connectionTesterIndex.get(providerKey);
+}
