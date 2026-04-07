@@ -6,6 +6,9 @@ export type OAuth2AuthConfig = {
   tokenUrl: string;
   scopes: string[];
   pkce?: boolean;
+  authorizationParams?: Record<string, string>;
+  tokenAuthMethod?: "body" | "basic";
+  tokenRequestFormat?: "form" | "json";
 };
 
 export type ApiKeyAuthConfig = {

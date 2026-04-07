@@ -1,0 +1,1334 @@
+{
+  "key": "notion",
+  "name": "Notion",
+  "description": "Send authenticated requests to the Notion API for pages, data sources, blocks, comments, search, and user resources.",
+  "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/4/45/Notion_app_logo.png",
+  "docsUrl": "https://developers.notion.com/reference/intro",
+  "authType": "oauth2",
+  "authConfig": {
+    "type": "oauth2",
+    "authorizationUrl": "https://api.notion.com/v1/oauth/authorize",
+    "tokenUrl": "https://api.notion.com/v1/oauth/token",
+    "scopes": [],
+    "pkce": false,
+    "authorizationParams": {
+      "owner": "user"
+    },
+    "tokenAuthMethod": "basic",
+    "tokenRequestFormat": "json"
+  },
+  "triggers": [],
+  "actions": [
+    {
+      "key": "notion.api_request",
+      "name": "Notion API Request",
+      "description": "Call any Notion API endpoint with a raw HTTP configuration.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PATCH",
+              "DELETE"
+            ],
+            "description": "HTTP method for the Notion API call"
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/",
+            "description": "Full Notion API URL",
+            "x-label": "API URL"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "queryParams": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "description": "Optional query string parameters",
+            "x-label": "Query Parameters"
+          },
+          "body": {
+            "description": "Optional JSON body for POST and PATCH requests",
+            "x-label": "Request Body (JSON)"
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.search",
+      "name": "Search",
+      "description": "Search pages and data sources in a Notion workspace.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.notion.com/v1/search"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "body": {
+            "type": "object",
+            "description": "Notion search request body.",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "The string to search for. If omitted, the response includes all pages and data sources that the integration has access to.",
+                "x-label": "Search Query"
+              },
+              "sort": {
+                "type": "object",
+                "description": "When supplied, sorts the results. Currently, the only supported sort criteria is by `last_edited_time`.",
+                "properties": {
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "description": "The direction to sort. Possible values: `asc`, `desc`."
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "enum": [
+                      "last_edited_time"
+                    ],
+                    "description": "The name of the timestamp to sort by. Possible values: `last_edited_time`."
+                  }
+                },
+                "required": [
+                  "direction",
+                  "timestamp"
+                ],
+                "x-label": "Sort Criteria"
+              },
+              "filter": {
+                "type": "object",
+                "description": "When supplied, filters the results. Currently, the only supported filter is by `object` type. You can search only for `page` or `database`.",
+                "properties": {
+                  "property": {
+                    "type": "string",
+                    "enum": [
+                      "object"
+                    ],
+                    "description": "The name of the property to filter on. Currently, only `object` is supported."
+                  },
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "page",
+                      "database"
+                    ],
+                    "description": "The value of the property to filter on. Possible values: `page`, `database`."
+                  }
+                },
+                "required": [
+                  "property",
+                  "value"
+                ],
+                "x-label": "Filter Criteria"
+              },
+              "start_cursor": {
+                "type": "string",
+                "format": "uuid",
+                "description": "If supplied, Notion will return a `page_size` amount of results starting after the cursor provided. If no cursor is provided, it will return results from the beginning of the list.",
+                "x-label": "Start Cursor"
+              },
+              "page_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 100,
+                "description": "The number of results to return. Default: 100. Max: 100.",
+                "x-label": "Page Size"
+              }
+            }
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.create_page",
+      "name": "Create Page",
+      "description": "Create a new Notion page in a parent page or datai source.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.notion.com/v1/pages"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "body": {
+            "type": "object",
+            "description": "Create page payload. Must include parent and properties, and may include children, icon, or cover.",
+            "properties": {
+              "parent": {
+                "type": "object",
+                "description": "A parent object representing where the page is located in Notion. A page is always a child of a page or a database.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "database_id"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "database_id",
+                        "description": "The type of the parent, indicating the page belongs to a database."
+                      },
+                      "database_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The ID of the database that the page belongs to.",
+                        "x-ask-user": true,
+                        "x-label": "Database ID"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "page_id"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "page_id",
+                        "description": "The type of the parent, indicating the page is a child of another page."
+                      },
+                      "page_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The ID of the page that the new page will be a child of.",
+                        "x-ask-user": true,
+                        "x-label": "Parent Page ID"
+                      }
+                    }
+                  }
+                ],
+                "x-label": "Page Parent"
+              },
+              "properties": {
+                "type": "object",
+                "description": "The properties of the page. The keys are the names or IDs of the properties as they appear in Notion. The values are Property Value objects. This object is highly dynamic and depends on the parent database schema. Provide a JSON object where keys are property names/IDs and values are Notion property value objects.",
+                "x-label": "Page Properties (JSON)",
+                "x-ask-user": true
+              },
+              "children": {
+                "type": "array",
+                "description": "An array of Block objects to add as children to the page. Blocks can be pages, paragraphs, headings, to-do lists, etc. Each object should conform to the Notion Block object schema.",
+                "items": {
+                  "type": "object",
+                  "description": "A Notion Block object. Refer to Notion API documentation for valid block types and their structures."
+                },
+                "x-label": "Child Blocks (JSON Array)",
+                "x-ask-user": true
+              },
+              "icon": {
+                "type": "object",
+                "description": "Page icon. Can be an emoji or an external file. If null, removes the icon.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "emoji"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "emoji"
+                      },
+                      "emoji": {
+                        "type": "string",
+                        "description": "A unicode emoji character for the icon.",
+                        "x-label": "Emoji Icon"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "external"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "external"
+                      },
+                      "external": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "The URL of the external image for the icon.",
+                            "x-label": "External Icon URL"
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "x-label": "Page Icon"
+              },
+              "cover": {
+                "type": "object",
+                "description": "Page cover. An external file. If null, removes the cover.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "external"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "external"
+                      },
+                      "external": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "The URL of the external image for the cover.",
+                            "x-label": "External Cover URL"
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "x-label": "Page Cover"
+              }
+            },
+            "required": [
+              "parent",
+              "properties"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.get_page",
+      "name": "Get Page",
+      "description": "Retrieve a page by id.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/pages/(?<page_id>[^/]+)$",
+            "description": "Full Notion API URL for retrieving a page. The `page_id` will be extracted from this URL.",
+            "x-label": "Page URL",
+            "properties": {
+              "page_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Identifier for a Notion page.",
+                "x-ask-user": true,
+                "x-label": "Page ID"
+              }
+            },
+            "required": ["page_id"]
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "queryParams": {
+            "type": "object",
+            "description": "Optional query parameters.",
+            "properties": {
+              "filter_properties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "A list of property identifiers (IDs or names) to include in the response. If not provided, all properties will be included.",
+                "x-label": "Filter Properties"
+              },
+              "archive_mode": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "not_archived",
+                  "archived"
+                ],
+                "default": "not_archived",
+                "description": "Filter by the page's archive status. When retrieving a page, the default is `not_archived`. Possible values: `all`, `not_archived`, `archived`.",
+                "x-label": "Archive Mode"
+              }
+            }
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.update_page",
+      "name": "Update Page",
+      "description": "Update page properties, icon, cover, or archive state.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "PATCH"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/pages/(?<page_id>[^/]+)$",
+            "description": "Full Notion API URL for updating a page. The `page_id` will be extracted from this URL.",
+            "x-label": "Page URL",
+            "properties": {
+              "page_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Identifier for a Notion page.",
+                "x-ask-user": true,
+                "x-label": "Page ID"
+              }
+            },
+            "required": ["page_id"]
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "body": {
+            "type": "object",
+            "description": "Update page payload. Example fields: properties, archived, icon, cover. Note: 'in_trash' is deprecated, use 'archived' instead.",
+            "properties": {
+              "properties": {
+                "type": "object",
+                "description": "Page properties to update. The keys are the names or IDs of the properties as they appear in Notion. The values are Property Value objects. This object is highly dynamic and depends on the parent database schema. Provide a JSON object where keys are property names/IDs and values are Notion property value objects.",
+                "x-label": "Page Properties (JSON)",
+                "x-ask-user": true
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Set to `true` to archive the page, or `false` to unarchive. Note: archived pages cannot be updated until they are unarchived.",
+                "x-label": "Archive Page"
+              },
+              "icon": {
+                "type": "object",
+                "description": "Page icon. Can be an emoji or an external file. If null, removes the icon.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "emoji"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "emoji"
+                      },
+                      "emoji": {
+                        "type": "string",
+                        "description": "A unicode emoji character for the icon.",
+                        "x-label": "Emoji Icon"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "external"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "external"
+                      },
+                      "external": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "The URL of the external image for the icon.",
+                            "x-label": "External Icon URL"
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "x-label": "Page Icon"
+              },
+              "cover": {
+                "type": "object",
+                "description": "Page cover. An external file. If null, removes the cover.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "external"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "external"
+                      },
+                      "external": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "The URL of the external image for the cover.",
+                            "x-label": "External Cover URL"
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "x-label": "Page Cover"
+              }
+            },
+            "minProperties": 1,
+            "errorMessage": "At least one property (properties, archived, icon, or cover) must be provided for update."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.query_data_source",
+      "name": "Query Data Source",
+      "description": "Query entries from a Notion data source.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/data_sources/(?<data_source_id>[^/]+)/query$",
+            "description": "Full Notion API URL for querying a data source. The `data_source_id` will be extracted from this URL.",
+            "x-label": "Data Source URL",
+            "properties": {
+              "data_source_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Identifier for a Notion data source (database).",
+                "x-ask-user": true,
+                "x-label": "Data Source ID"
+              }
+            },
+            "required": ["data_source_id"]
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "body": {
+            "type": "object",
+            "description": "Query payload. Example fields: filter, sorts, start_cursor, page_size.",
+            "properties": {
+              "filter": {
+                "type": "object",
+                "description": "A Notion filter object to filter the database entries. Refer to Notion API documentation for detailed filter object schema (e.g., 'or' / 'and' conditions, property filters).",
+                "x-label": "Filter (JSON)",
+                "x-ask-user": true
+              },
+              "sorts": {
+                "type": "array",
+                "description": "An array of Notion sort objects to sort the database entries.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "property": {
+                      "type": "string",
+                      "description": "The name or ID of the property to sort by. Required if 'timestamp' is not present.",
+                      "x-label": "Sort Property Name/ID"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "enum": [
+                        "created_time",
+                        "last_edited_time"
+                      ],
+                      "description": "The name of the timestamp to sort by. Possible values: `created_time`, `last_edited_time`. Required if 'property' is not present.",
+                      "x-label": "Sort Timestamp"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "description": "The direction to sort. Possible values: `asc`, `desc`."
+                    }
+                  },
+                  "oneOf": [
+                    {
+                      "required": [
+                        "property",
+                        "direction"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "timestamp",
+                        "direction"
+                      ]
+                    }
+                  ]
+                },
+                "x-label": "Sorts (JSON Array)",
+                "x-ask-user": true
+              },
+              "start_cursor": {
+                "type": "string",
+                "format": "uuid",
+                "description": "If supplied, Notion will return a `page_size` amount of results starting after the cursor provided. If no cursor is provided, it will return results from the beginning of the list.",
+                "x-label": "Start Cursor"
+              },
+              "page_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 100,
+                "description": "The number of results to return. Default: 100. Max: 100.",
+                "x-label": "Page Size"
+              },
+              "filter_properties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "A list of property identifiers (IDs or names) to include in the response. If not provided, all properties will be included.",
+                "x-label": "Filter Properties"
+              }
+            }
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.get_block_children",
+      "name": "Get Block Children",
+      "description": "List children for a block.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/blocks/(?<block_id>[^/]+)/children$",
+            "description": "Full Notion API URL for retrieving block children. The `block_id` will be extracted from this URL.",
+            "x-label": "Block URL",
+            "properties": {
+              "block_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Identifier for a Notion block.",
+                "x-ask-user": true,
+                "x-label": "Block ID"
+              }
+            },
+            "required": ["block_id"]
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "queryParams": {
+            "type": "object",
+            "description": "Optional query parameters such as start_cursor or page_size",
+            "properties": {
+              "start_cursor": {
+                "type": "string",
+                "format": "uuid",
+                "description": "If supplied, Notion will return a `page_size` amount of results starting after the cursor provided. If no cursor is provided, it will return results from the beginning of the list.",
+                "x-label": "Start Cursor"
+              },
+              "page_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 100,
+                "description": "The number of results to return. Default: 100. Max: 100.",
+                "x-label": "Page Size"
+              }
+            }
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.append_block_children",
+      "name": "Append Block Children",
+      "description": "Append child blocks to an existing block.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "PATCH"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/blocks/(?<block_id>[^/]+)/children$",
+            "description": "Full Notion API URL for appending block children. The `block_id` will be extracted from this URL.",
+            "x-label": "Block URL",
+            "properties": {
+              "block_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Identifier for a Notion block.",
+                "x-ask-user": true,
+                "x-label": "Block ID"
+              }
+            },
+            "required": ["block_id"]
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "body": {
+            "type": "object",
+            "description": "Append children payload. Usually includes a children array and optionally after.",
+            "properties": {
+              "children": {
+                "type": "array",
+                "description": "An array of Block objects to add as children to the block. Each object should conform to the Notion Block object schema. Refer to Notion API documentation for valid block types and their structures.",
+                "items": {
+                  "type": "object"
+                },
+                "minItems": 1,
+                "x-label": "Child Blocks (JSON Array)",
+                "x-ask-user": true
+              },
+              "after": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The ID of the block that the new blocks should be appended after. If not provided, the new blocks will be appended to the end of the children list.",
+                "x-label": "Append After Block ID"
+              }
+            },
+            "required": [
+              "children"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.create_comment",
+      "name": "Create Comment",
+      "description": "Create a comment on a page or block discussion thread.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.notion.com/v1/comments"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "body": {
+            "type": "object",
+            "description": "Create comment payload. Must follow Notion's comments API shape.",
+            "properties": {
+              "parent": {
+                "type": "object",
+                "description": "A parent object representing where the comment is located in Notion. A comment must be a child of a page or a block discussion thread.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "page_id"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "page_id"
+                      },
+                      "page_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The ID of the page that the comment belongs to.",
+                        "x-ask-user": true,
+                        "x-label": "Page ID"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "block_id"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "block_id"
+                      },
+                      "block_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The ID of the block discussion thread that the comment belongs to.",
+                        "x-ask-user": true,
+                        "x-label": "Block ID"
+                      }
+                    }
+                  }
+                ],
+                "x-label": "Comment Parent"
+              },
+              "discussion_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The ID of the discussion thread. If not provided, a new discussion thread is created.",
+                "x-label": "Discussion ID (Optional)"
+              },
+              "rich_text": {
+                "type": "array",
+                "description": "A list of rich text objects that represent the content of the comment. Each rich text object represents a chunk of text with a specific style (e.g., bold, italic) or mention.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "mention",
+                        "equation"
+                      ],
+                      "description": "The type of the rich text object."
+                    },
+                    "text": {
+                      "type": "object",
+                      "properties": {
+                        "content": {
+                          "type": "string",
+                          "description": "The plain text content."
+                        },
+                        "link": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "format": "uri",
+                              "description": "The URL of the link."
+                            }
+                          },
+                          "required": [
+                            "url"
+                          ],
+                          "description": "Optional URL for a text link."
+                        }
+                      },
+                      "required": [
+                        "content"
+                      ]
+                    },
+                    "annotations": {
+                      "type": "object",
+                      "properties": {
+                        "bold": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "italic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "strikethrough": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "underline": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "code": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "color": {
+                          "type": "string",
+                          "enum": [
+                            "default",
+                            "gray",
+                            "brown",
+                            "orange",
+                            "yellow",
+                            "green",
+                            "blue",
+                            "purple",
+                            "pink",
+                            "red",
+                            "gray_background",
+                            "brown_background",
+                            "orange_background",
+                            "yellow_background",
+                            "green_background",
+                            "blue_background",
+                            "purple_background",
+                            "pink_background",
+                            "red_background"
+                          ],
+                          "default": "default"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "minItems": 1,
+                "x-label": "Comment Content (Rich Text JSON Array)",
+                "x-ask-user": true
+              }
+            },
+            "required": [
+              "parent",
+              "rich_text"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.list_users",
+      "name": "List Users",
+      "description": "List users and bots in the connected Notion workspace.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.notion.com/v1/users"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Notion-Version": {
+                "type": "string",
+                "description": "Notion API version header, for example 2022-06-28",
+                "default": "2022-06-28",
+                "x-label": "Notion API Version"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Notion-Version"
+            ],
+            "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection.",
+            "x-label": "Headers"
+          },
+          "queryParams": {
+            "type": "object",
+            "description": "Optional query parameters such as start_cursor or page_size",
+            "properties": {
+              "start_cursor": {
+                "type": "string",
+                "format": "uuid",
+                "description": "If supplied, Notion will return a `page_size` amount of results starting after the cursor provided. If no cursor is provided, it will return results from the beginning of the list.",
+                "x-label": "Start Cursor"
+              },
+              "page_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 100,
+                "description": "The number of results to return. Default: 100. Max: 100.",
+                "x-label": "Page Size"
+              }
+            }
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    }
+  ]
+}

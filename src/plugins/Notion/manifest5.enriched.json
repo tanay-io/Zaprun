@@ -1,0 +1,1023 @@
+{
+  "key": "notion",
+  "name": "Notion",
+  "description": "Send authenticated requests to the Notion API for pages, data sources, blocks, comments, search, and user resources.",
+  "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/4/45/Notion_app_logo.png",
+  "docsUrl": "https://developers.notion.com/reference/intro",
+  "authType": "oauth2",
+  "authConfig": {
+    "type": "oauth2",
+    "authorizationUrl": "https://api.notion.com/v1/oauth/authorize",
+    "tokenUrl": "https://api.notion.com/v1/oauth/token",
+    "scopes": [],
+    "pkce": false,
+    "authorizationParams": {
+      "owner": "user"
+    },
+    "tokenAuthMethod": "basic",
+    "tokenRequestFormat": "json"
+  },
+  "triggers": [],
+  "definitions": {
+    "uuid_string": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+      "description": "A Notion-style UUID string (e.g., 'f6717a63-a2b6-45ef-b152-3d5f96e480d5')."
+    },
+    "notion_version_header": {
+      "type": "string",
+      "description": "Notion API version header, for example '2022-06-28'. Consult Notion API reference for supported versions. This header is required for all requests. The latest stable version is recommended.",
+      "x-label": "Notion API Version",
+      "default": "2022-06-28",
+      "x-ask-user": true
+    },
+    "standard_headers_block": {
+      "type": "object",
+      "properties": {
+        "Notion-Version": { "$ref": "#/definitions/notion_version_header" }
+      },
+      "additionalProperties": {
+        "type": "string"
+      },
+      "required": [
+        "Notion-Version"
+      ],
+      "description": "HTTP headers for the Notion API request. Authorization is injected automatically from the connection."
+    },
+    "parent_object": {
+      "type": "object",
+      "description": "The parent object for a new page or database. This specifies where the resource lives within Notion.",
+      "x-ask-user": true,
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "type": "string", "const": "database_id", "description": "The type of parent, indicating it's a database." },
+            "database_id": {
+              "$ref": "#/definitions/uuid_string",
+              "description": "The ID of the database that is the parent of this resource.",
+              "x-label": "Parent Database ID",
+              "x-ask-user": true
+            }
+          },
+          "required": ["type", "database_id"]
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "const": "page_id", "description": "The type of parent, indicating it's a page." },
+            "page_id": {
+              "$ref": "#/definitions/uuid_string",
+              "description": "The ID of the page that is the parent of this resource.",
+              "x-label": "Parent Page ID",
+              "x-ask-user": true
+            }
+          },
+          "required": ["type", "page_id"]
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "const": "workspace", "description": "The type of parent, indicating it's the entire workspace." },
+            "workspace": {
+              "type": "boolean",
+              "const": true,
+              "description": "Set to `true` if the parent is the workspace itself (only valid for top-level pages).",
+              "x-label": "Parent Workspace",
+              "x-ask-user": true
+            }
+          },
+          "required": ["type", "workspace"]
+        }
+      ]
+    },
+    "icon_object": {
+      "type": "object",
+      "description": "An emoji or external file icon for a Notion page or database.",
+      "x-ask-user": true,
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "type": "string", "const": "emoji", "description": "The type of icon, indicating an emoji." },
+            "emoji": {
+              "type": "string",
+              "description": "An emoji character. E.g., '💡' or '🎉'.",
+              "x-label": "Emoji Icon",
+              "x-ask-user": true
+            }
+          },
+          "required": ["type", "emoji"]
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "const": "external", "description": "The type of icon, indicating an external image file." },
+            "external": {
+              "type": "object",
+              "description": "An external file object.",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "The URL of the external image file.",
+                  "x-label": "External Icon URL",
+                  "x-ask-user": true
+                }
+              },
+              "required": ["url"]
+            }
+          },
+          "required": ["type", "external"]
+        }
+      ]
+    },
+    "cover_object": {
+      "type": "object",
+      "description": "An external file or Notion file cover image for a Notion page.",
+      "x-ask-user": true,
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "type": "string", "const": "external", "description": "The type of cover, indicating an external image file." },
+            "external": {
+              "type": "object",
+              "description": "An external file object.",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "The URL of the external image file.",
+                  "x-label": "External Cover URL",
+                  "x-ask-user": true
+                }
+              },
+              "required": ["url"]
+            }
+          },
+          "required": ["type", "external"]
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "const": "file", "description": "The type of cover, indicating a Notion-hosted file." },
+            "file": {
+              "type": "object",
+              "description": "A Notion-hosted file object. (Not often used for create/update, typically read-only with a temporary URL).",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "The URL of the Notion file. (Generally read-only, Notion provides this URL).",
+                  "x-label": "Notion File Cover URL",
+                  "x-ask-user": true
+                },
+                "expiry_time": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The date and time the URL expires. (Read-only).",
+                  "readOnly": true
+                }
+              },
+              "required": ["url"]
+            }
+          },
+          "required": ["type", "file"]
+        }
+      ]
+    },
+    "rich_text_object_array": {
+        "type": "array",
+        "description": "An array of rich text objects that represent formatted text content. Refer to Notion API documentation for full details on rich text objects and their types (text, mention, equation).",
+        "x-label": "Rich Text Content",
+        "x-ask-user": true,
+        "items": {
+            "type": "object",
+            "description": "A rich text object.",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "The type of the rich text object (e.g., 'text', 'mention', 'equation').",
+                    "enum": ["text", "mention", "equation"],
+                    "x-label": "Rich Text Object Type",
+                    "x-ask-user": true
+                },
+                "text": {
+                    "type": "object",
+                    "description": "A text object with content and optional link.",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "The plain text content.",
+                            "x-label": "Text Content",
+                            "x-ask-user": true
+                        },
+                        "link": {
+                            "type": "object",
+                            "description": "An optional URL link associated with the text.",
+                            "properties": {
+                                "url": {
+                                    "type": "string",
+                                    "format": "uri",
+                                    "description": "The URL.",
+                                    "x-label": "Link URL",
+                                    "x-ask-user": true
+                                }
+                            },
+                            "required": ["url"]
+                        }
+                    },
+                    "required": ["content"]
+                },
+                "mention": {
+                    "type": "object",
+                    "description": "A mention object.",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": ["user", "page", "database", "date"],
+                            "description": "Type of mention.",
+                            "x-label": "Mention Type",
+                            "x-ask-user": true
+                        },
+                        "user": {
+                            "type": "object",
+                            "properties": { "id": { "$ref": "#/definitions/uuid_string", "description": "ID of the user being mentioned.", "x-label": "User ID", "x-ask-user": true } },
+                            "required": ["id"]
+                        },
+                        "page": {
+                            "type": "object",
+                            "properties": { "id": { "$ref": "#/definitions/uuid_string", "description": "ID of the page being mentioned.", "x-label": "Page ID", "x-ask-user": true } },
+                            "required": ["id"]
+                        },
+                        "database": {
+                            "type": "object",
+                            "properties": { "id": { "$ref": "#/definitions/uuid_string", "description": "ID of the database being mentioned.", "x-label": "Database ID", "x-ask-user": true } },
+                            "required": ["id"]
+                        },
+                        "date": {
+                            "type": "object",
+                            "description": "Date or date range being mentioned.",
+                            "properties": {
+                                "start": { "type": "string", "format": "date-time", "description": "ISO 8601 date, with an optional time. E.g., '2024-01-01T12:00:00Z'.", "x-label": "Start Date", "x-ask-user": true },
+                                "end": { "type": "string", "format": "date-time", "description": "ISO 8601 end date, with an optional time (optional). E.g., '2024-01-01T12:00:00Z'.", "x-label": "End Date (Optional)", "x-ask-user": true },
+                                "time_zone": { "type": "string", "description": "Time zone in 'America/Los_Angeles' format (optional).", "x-label": "Time Zone (Optional)", "x-ask-user": true }
+                            },
+                            "required": ["start"]
+                        }
+                    },
+                    "oneOf": [
+                        { "required": ["type", "user"], "properties": { "type": { "const": "user" } } },
+                        { "required": ["type", "page"], "properties": { "type": { "const": "page" } } },
+                        { "required": ["type", "database"], "properties": { "type": { "const": "database" } } },
+                        { "required": ["type", "date"], "properties": { "type": { "const": "date" } } }
+                    ]
+                },
+                "equation": {
+                    "type": "object",
+                    "description": "An inline equation object.",
+                    "properties": {
+                        "expression": {
+                            "type": "string",
+                            "description": "The LaTeX string for the inline equation.",
+                            "x-label": "Equation Expression",
+                            "x-ask-user": true
+                        }
+                    },
+                    "required": ["expression"]
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Optional formatting annotations for the rich text.",
+                    "properties": {
+                        "bold": { "type": "boolean", "default": false, "x-label": "Bold" },
+                        "italic": { "type": "boolean", "default": false, "x-label": "Italic" },
+                        "strikethrough": { "type": "boolean", "default": false, "x-label": "Strikethrough" },
+                        "underline": { "type": "boolean", "default": false, "x-label": "Underline" },
+                        "code": { "type": "boolean", "default": false, "x-label": "Code" },
+                        "color": {
+                            "type": "string",
+                            "enum": ["default", "gray", "brown", "orange", "yellow", "green", "blue", "purple", "pink", "red", "gray_background", "brown_background", "orange_background", "yellow_background", "green_background", "blue_background", "purple_background", "pink_background", "red_background"],
+                            "default": "default",
+                            "x-label": "Color"
+                        }
+                    }
+                },
+                "href": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "A URL for the rich text. Takes precedence over text.link if both are present.",
+                    "x-label": "Hyperlink (Optional)",
+                    "x-ask-user": true
+                }
+            },
+            "oneOf": [
+                { "required": ["type", "text"], "properties": { "type": { "const": "text" } } },
+                { "required": ["type", "mention"], "properties": { "type": { "const": "mention" } } },
+                { "required": ["type", "equation"], "properties": { "type": { "const": "equation" } } }
+            ]
+        }
+    },
+    "query_pagination_params": {
+      "type": "object",
+      "description": "Common pagination parameters for paginated Notion API requests.",
+      "properties": {
+        "start_cursor": {
+          "type": "string",
+          "description": "If supplied, the results will start after the item indicated by this cursor. This is typically the 'next_cursor' value from a previous response.",
+          "x-label": "Start Cursor (Optional)",
+          "x-ask-user": true
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "The number of items from the results to return.",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 100,
+          "x-label": "Page Size",
+          "x-ask-user": true
+        }
+      }
+    }
+  },
+  "actions": [
+    {
+      "key": "notion.api_request",
+      "name": "Notion API Request",
+      "description": "Call any Notion API endpoint with a raw HTTP configuration.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PATCH",
+              "DELETE"
+            ],
+            "description": "HTTP method for the Notion API call"
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/",
+            "description": "Full Notion API URL. Must start with 'https://api.notion.com/v1/'.",
+            "x-label": "Notion API URL",
+            "x-ask-user": true
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "queryParams": {
+            "type": "object",
+            "description": "Optional query string parameters, passed as key-value pairs. Example: { \"param1\": \"value1\", \"param2\": 123 }",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "additionalProperties": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "number" },
+                { "type": "boolean" }
+              ]
+            }
+          },
+          "body": {
+            "type": "object",
+            "description": "Optional JSON body for POST and PATCH requests. The structure depends on the specific Notion API endpoint being called.",
+            "x-label": "Request Body (JSON)",
+            "x-ask-user": true,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.search",
+      "name": "Search",
+      "description": "Search pages and databases in a Notion workspace. Returns a paginated list of pages and databases.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.notion.com/v1/search",
+            "description": "The Notion API endpoint for searching."
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "body": {
+            "type": "object",
+            "description": "Notion search request body to filter and sort results.",
+            "x-label": "Search Criteria",
+            "x-ask-user": true,
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "The text to search for. If omitted, results are limited to only those matching the 'filter' conditions.",
+                "x-label": "Search Query",
+                "x-ask-user": true
+              },
+              "sort": {
+                "type": "object",
+                "description": "The direction and property to sort the results by. Example: { \"direction\": \"ascending\", \"timestamp\": \"last_edited_time\" }. Refer to Notion API documentation for full sort object structure.",
+                "x-label": "Sort By",
+                "x-ask-user": true,
+                "properties": {
+                  "direction": {
+                    "type": "string",
+                    "enum": ["ascending", "descending"],
+                    "default": "ascending",
+                    "description": "The direction to sort the results.",
+                    "x-label": "Sort Direction",
+                    "x-ask-user": true
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "enum": ["created_time", "last_edited_time"],
+                    "default": "last_edited_time",
+                    "description": "The type of timestamp to sort by.",
+                    "x-label": "Sort Timestamp Type",
+                    "x-ask-user": true
+                  }
+                },
+                "required": ["direction", "timestamp"],
+                "additionalProperties": false
+              },
+              "filter": {
+                "type": "object",
+                "description": "A filter condition to apply to the search results. Example: { \"property\": \"object\", \"value\": \"page\" } to filter for pages only. Refer to Notion API documentation for full filter object structure.",
+                "x-label": "Filter Results",
+                "x-ask-user": true,
+                "properties": {
+                    "property": {
+                        "type": "string",
+                        "description": "The name of the property to filter on (e.g., 'object').",
+                        "x-label": "Filter Property",
+                        "x-ask-user": true
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "The value to filter by (e.g., 'page' for 'object' property).",
+                        "x-label": "Filter Value",
+                        "x-ask-user": true
+                    }
+                },
+                "required": ["property", "value"],
+                "additionalProperties": false
+              },
+              "start_cursor": { "$ref": "#/definitions/query_pagination_params/properties/start_cursor" },
+              "page_size": { "$ref": "#/definitions/query_pagination_params/properties/page_size" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.create_page",
+      "name": "Create Page",
+      "description": "Create a new Notion page in a parent page, database, or at the workspace root.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.notion.com/v1/pages",
+            "description": "The Notion API endpoint for creating pages."
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "body": {
+            "type": "object",
+            "description": "Create page payload. Must include a 'parent' and 'properties'. May include 'children', 'icon', or 'cover'.",
+            "x-label": "Page Details",
+            "properties": {
+              "parent": { "$ref": "#/definitions/parent_object" },
+              "properties": {
+                "type": "object",
+                "description": "Key-value pairs representing the page's properties. Keys are property names or IDs, values are Notion property value objects (e.g., {'Name': {'title': [{'text': {'content': 'My New Page'}}]}}). Refer to Notion API documentation for detailed property object structure.",
+                "x-label": "Page Properties",
+                "x-ask-user": true,
+                "additionalProperties": true
+              },
+              "children": {
+                "type": "array",
+                "description": "An array of block objects to set as children of the new page. Refer to Notion API documentation for block object structure (e.g., paragraph, heading_1, to_do).",
+                "x-label": "Child Blocks (Optional)",
+                "x-ask-user": true,
+                "items": {
+                  "type": "object",
+                  "description": "A Notion block object.",
+                  "additionalProperties": true
+                }
+              },
+              "icon": { "$ref": "#/definitions/icon_object" },
+              "cover": { "$ref": "#/definitions/cover_object" }
+            },
+            "required": ["parent", "properties"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.get_page",
+      "name": "Get Page",
+      "description": "Retrieve a page by its ID.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/pages/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "description": "The full Notion API URL for the page. Must be in the format 'https://api.notion.com/v1/pages/{page_id}'.",
+            "x-label": "Page URL (e.g., https://api.notion.com/v1/pages/PAGE_ID)",
+            "x-ask-user": true
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "queryParams": {
+            "type": "object",
+            "description": "Optional query parameters.",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "properties": {
+              "filter_properties": {
+                "type": "array",
+                "description": "A comma-separated list of page property IDs or names to filter for. Only the specified properties will be returned. E.g., ['title', 'status'].",
+                "items": { "type": "string", "x-label": "Property ID or Name", "x-ask-user": true },
+                "x-label": "Filter Properties (Optional)",
+                "x-ask-user": true
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.update_page",
+      "name": "Update Page",
+      "description": "Update page properties, icon, cover, or archive state for a given page ID.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "PATCH"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/pages/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "description": "The full Notion API URL for the page to update. Must be in the format 'https://api.notion.com/v1/pages/{page_id}'.",
+            "x-label": "Page URL (e.g., https://api.notion.com/v1/pages/PAGE_ID)",
+            "x-ask-user": true
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "body": {
+            "type": "object",
+            "description": "Update page payload. Example fields: 'properties', 'archived', 'icon', 'cover'. Note: 'in_trash' has been deprecated since '2022-09-08' in favor of 'archived'.",
+            "x-label": "Page Update Details",
+            "properties": {
+              "properties": {
+                "type": "object",
+                "description": "Key-value pairs representing the page's properties to update. Keys are property names or IDs, values are Notion property value objects. Refer to Notion API documentation for detailed property object structure.",
+                "x-label": "Page Properties to Update",
+                "x-ask-user": true,
+                "additionalProperties": true
+              },
+              "icon": { "$ref": "#/definitions/icon_object" },
+              "cover": { "$ref": "#/definitions/cover_object" },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the page is archived. Archiving a page moves it to the trash.",
+                "x-label": "Archive Page",
+                "x-ask-user": true
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.query_data_source",
+      "name": "Query Data Source",
+      "description": "Query entries from a Notion database (previously 'data source').",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/databases/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/query$",
+            "description": "The full Notion API URL for querying the database. Must be in the format 'https://api.notion.com/v1/databases/{database_id}/query'.",
+            "x-label": "Database Query URL (e.g., https://api.notion.com/v1/databases/DATABASE_ID/query)",
+            "x-ask-user": true
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "body": {
+            "type": "object",
+            "description": "Query payload including filters, sorts, and pagination.",
+            "x-label": "Database Query Criteria",
+            "properties": {
+              "filter": {
+                "type": "object",
+                "description": "Filter criteria to apply to the database entries. Refer to Notion API documentation for detailed filter object structure (e.g., property, checkbox, select, multi_select, rich_text filters).",
+                "x-label": "Filter Entries",
+                "x-ask-user": true,
+                "additionalProperties": true
+              },
+              "sorts": {
+                "type": "array",
+                "description": "An array of sort objects to define the order of results. Refer to Notion API documentation for detailed sort object structure (e.g., [{'property': 'Name', 'direction': 'ascending'}]).",
+                "x-label": "Sort Order",
+                "x-ask-user": true,
+                "items": {
+                  "type": "object",
+                  "description": "A sort object.",
+                  "additionalProperties": true
+                }
+              },
+              "start_cursor": { "$ref": "#/definitions/query_pagination_params/properties/start_cursor" },
+              "page_size": { "$ref": "#/definitions/query_pagination_params/properties/page_size" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.get_block_children",
+      "name": "Get Block Children",
+      "description": "List children for a block, such as a page or a toggle block.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/blocks/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/children$",
+            "description": "The full Notion API URL for listing block children. Must be in the format 'https://api.notion.com/v1/blocks/{block_id}/children'.",
+            "x-label": "Block Children URL (e.g., https://api.notion.com/v1/blocks/BLOCK_ID/children)",
+            "x-ask-user": true
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "queryParams": {
+            "$ref": "#/definitions/query_pagination_params"
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.append_block_children",
+      "name": "Append Block Children",
+      "description": "Append child blocks to an existing block.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "PATCH"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.notion\\.com/v1/blocks/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/children$",
+            "description": "The full Notion API URL for appending block children. Must be in the format 'https://api.notion.com/v1/blocks/{block_id}/children'.",
+            "x-label": "Append Block Children URL (e.g., https://api.notion.com/v1/blocks/BLOCK_ID/children)",
+            "x-ask-user": true
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "body": {
+            "type": "object",
+            "description": "Append children payload. Must include a 'children' array, and may include 'after' to specify the position.",
+            "x-label": "Blocks to Append",
+            "properties": {
+              "children": {
+                "type": "array",
+                "description": "An array of block objects to append as children. Refer to Notion API documentation for block object structure (e.g., paragraph, heading_1, to_do).",
+                "x-label": "Child Blocks",
+                "x-ask-user": true,
+                "items": {
+                  "type": "object",
+                  "description": "A Notion block object.",
+                  "additionalProperties": true
+                }
+              },
+              "after": {
+                "$ref": "#/definitions/uuid_string",
+                "description": "The ID of the block that the new blocks should be appended after. If omitted, blocks are appended at the end.",
+                "x-label": "Append After Block ID (Optional)",
+                "x-ask-user": true
+              }
+            },
+            "required": ["children"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.create_comment",
+      "name": "Create Comment",
+      "description": "Create a comment on a page or block discussion thread.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.notion.com/v1/comments",
+            "description": "The Notion API endpoint for creating comments."
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "body": {
+            "type": "object",
+            "description": "Create comment payload. Must include 'rich_text' content and either a 'parent' (for a new discussion) or 'discussion_id' (for an existing discussion).",
+            "x-label": "Comment Details",
+            "properties": {
+              "parent": {
+                "type": "object",
+                "description": "The parent object where the comment discussion lives. Used to create a new discussion thread.",
+                "x-ask-user": true,
+                "oneOf": [
+                  {
+                    "properties": {
+                      "type": { "type": "string", "const": "page_id", "description": "The type of parent, indicating it's a page." },
+                      "page_id": {
+                        "$ref": "#/definitions/uuid_string",
+                        "description": "The ID of the page where the new discussion should be started.",
+                        "x-label": "Parent Page ID",
+                        "x-ask-user": true
+                      }
+                    },
+                    "required": ["type", "page_id"]
+                  },
+                  {
+                    "properties": {
+                      "type": { "type": "string", "const": "block_id", "description": "The type of parent, indicating it's a block." },
+                      "block_id": {
+                        "$ref": "#/definitions/uuid_string",
+                        "description": "The ID of the block where the new discussion should be started.",
+                        "x-label": "Parent Block ID",
+                        "x-ask-user": true
+                      }
+                    },
+                    "required": ["type", "block_id"]
+                  }
+                ]
+              },
+              "discussion_id": {
+                "$ref": "#/definitions/uuid_string",
+                "description": "The ID of an existing discussion thread to add the comment to. If provided, 'parent' should not be used.",
+                "x-label": "Existing Discussion ID (Optional)",
+                "x-ask-user": true
+              },
+              "rich_text": { "$ref": "#/definitions/rich_text_object_array" }
+            },
+            "required": ["rich_text"],
+            "oneOf": [
+              { "required": ["parent"] },
+              { "required": ["discussion_id"] }
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "notion.list_users",
+      "name": "List Users",
+      "description": "List users and bots in the connected Notion workspace.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Notion workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.notion.com/v1/users",
+            "description": "The Notion API endpoint for listing users."
+          },
+          "headers": {
+            "$ref": "#/definitions/standard_headers_block"
+          },
+          "queryParams": {
+            "$ref": "#/definitions/query_pagination_params"
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the Notion API"
+      },
+      "requiresConnection": true
+    }
+  ]
+}

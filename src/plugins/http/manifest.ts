@@ -1,11 +1,6 @@
 import { ProviderManifest } from "../../types/manifest";
 
-/**
- * HTTP provider manifest — the reference plugin implementation.
- *
- * This is the simplest possible integration: no auth, one action (make an HTTP request).
- * Every future plugin (Slack, GitHub, Gmail, Stripe) follows this same pattern.
- */
+
 export const httpManifest: ProviderManifest = {
   key: "http",
   name: "HTTP Request",

@@ -1,0 +1,1888 @@
+{
+  "key": "github",
+  "name": "GitHub",
+  "description": "Send authenticated requests to the GitHub REST API for repositories, contents, issues, pull requests, search, and user resources.",
+  "iconUrl": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+  "docsUrl": "https://docs.github.com/en/rest",
+  "authType": "oauth2",
+  "authConfig": {
+    "type": "oauth2",
+    "authorizationUrl": "https://github.com/login/oauth/authorize",
+    "tokenUrl": "https://github.com/login/oauth/access_token",
+    "scopes": [
+      "repo",
+      "read:user",
+      "user:email"
+    ],
+    "pkce": false,
+    "tokenAuthMethod": "body",
+    "tokenRequestFormat": "form"
+  },
+  "triggers": [],
+  "actions": [
+    {
+      "key": "github.api_request",
+      "name": "GitHub API Request",
+      "description": "Call any GitHub REST API endpoint with a raw HTTP configuration.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "x-label": "HTTP Method",
+            "x-ask-user": true,
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/",
+            "x-label": "API URL",
+            "x-ask-user": true,
+            "description": "Full GitHub API URL starting with https://api.github.com/"
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "queryParams": {
+            "type": "object",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "description": "Optional query string parameters."
+          },
+          "body": {
+            "x-label": "Request Body",
+            "x-ask-user": true,
+            "description": "Optional JSON body for POST, PUT, PATCH, or DELETE requests."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.get_authenticated_user",
+      "name": "Get Authenticated User",
+      "description": "Get the GitHub user for the current OAuth connection.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.github.com/user",
+            "x-label": "API URL",
+            "description": "Full GitHub API URL for the authenticated user endpoint."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.list_user_repos",
+      "name": "List User Repositories",
+      "description": "List repositories visible to the authenticated user.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.github.com/user/repos",
+            "x-label": "API URL",
+            "description": "Full GitHub API URL for listing user repositories."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "queryParams": {
+            "type": "object",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "public",
+                  "private"
+                ],
+                "x-label": "Visibility",
+                "x-ask-user": true,
+                "description": "Limit results to repositories with the selected visibility."
+              },
+              "affiliation": {
+                "type": "string",
+                "x-label": "Affiliation",
+                "x-ask-user": true,
+                "description": "Comma-separated list of values. Can include: owner, collaborator, organization_member, enterprise_member, admin."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "owner",
+                  "public",
+                  "private",
+                  "member"
+                ],
+                "x-label": "Type (Legacy)",
+                "description": "Legacy repository type filter. Prefer visibility and affiliation for modern filtering."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "updated",
+                  "pushed",
+                  "full_name"
+                ],
+                "x-label": "Sort By",
+                "x-ask-user": true,
+                "description": "Field used to sort results."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "x-label": "Sort Direction",
+                "x-ask-user": true,
+                "description": "Sort direction."
+              },
+              "per_page": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 30,
+                "x-label": "Results Per Page",
+                "x-ask-user": true,
+                "description": "Results per page. Maximum 100."
+              },
+              "page": {
+                "type": "number",
+                "minimum": 1,
+                "default": 1,
+                "x-label": "Page Number",
+                "x-ask-user": true,
+                "description": "Page number for pagination."
+              }
+            },
+            "description": "Optional query parameters for filtering and pagination."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.get_repo",
+      "name": "Get Repository",
+      "description": "Get a repository by owner and repo.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/repos/[^/]+/[^/]+$",
+            "x-label": "Repository URL",
+            "x-ask-user": true,
+            "description": "Repository URL, for example https://api.github.com/repos/octocat/Hello-World"
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.create_repo",
+      "name": "Create Repository",
+      "description": "Create a repository for the authenticated user.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.github.com/user/repos",
+            "x-label": "API URL",
+            "description": "Full GitHub API URL for creating a user repository."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "body": {
+            "type": "object",
+            "x-label": "Request Body",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "Repository Name",
+                "x-ask-user": true,
+                "description": "Repository name."
+              },
+              "description": {
+                "type": "string",
+                "x-label": "Description",
+                "x-ask-user": true,
+                "description": "Repository description."
+              },
+              "homepage": {
+                "type": "string",
+                "x-label": "Homepage URL",
+                "x-ask-user": true,
+                "description": "Optional project homepage URL."
+              },
+              "private": {
+                "type": "boolean",
+                "default": false,
+                "x-label": "Private",
+                "x-ask-user": true,
+                "description": "Whether the repository is private. Defaults to false for public repositories."
+              },
+              "has_issues": {
+                "type": "boolean",
+                "default": true,
+                "x-label": "Enable Issues",
+                "description": "Enable GitHub Issues."
+              },
+              "has_projects": {
+                "type": "boolean",
+                "default": true,
+                "x-label": "Enable Projects",
+                "description": "Enable GitHub Projects."
+              },
+              "has_wiki": {
+                "type": "boolean",
+                "default": true,
+                "x-label": "Enable Wiki",
+                "description": "Enable GitHub Wiki."
+              },
+              "auto_init": {
+                "type": "boolean",
+                "default": false,
+                "x-label": "Auto Initialize",
+                "x-ask-user": true,
+                "description": "Create an initial commit with an empty README."
+              },
+              "gitignore_template": {
+                "type": "string",
+                "x-label": "Gitignore Template",
+                "x-ask-user": true,
+                "description": "Optional .gitignore template name."
+              },
+              "license_template": {
+                "type": "string",
+                "x-label": "License Template",
+                "x-ask-user": true,
+                "description": "Optional license template name."
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.get_repo_contents",
+      "name": "Get Repository Contents",
+      "description": "Get file or directory contents from a repository.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/repos/[^/]+/[^/]+/contents/.+",
+            "x-label": "Contents URL",
+            "x-ask-user": true,
+            "description": "Contents URL, for example https://api.github.com/repos/octocat/Hello-World/contents/README.md"
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "queryParams": {
+            "type": "object",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "ref": {
+                "type": "string",
+                "x-label": "Reference",
+                "x-ask-user": true,
+                "description": "The name of the commit/branch/tag. Defaults to the repository's default branch."
+              }
+            },
+            "description": "Optional query string parameters."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.create_or_update_file",
+      "name": "Create Or Update File",
+      "description": "Create a new file or update an existing file in a repository.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "PUT",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/repos/[^/]+/[^/]+/contents/.+",
+            "x-label": "Contents URL",
+            "x-ask-user": true,
+            "description": "Contents URL for the target file."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "body": {
+            "type": "object",
+            "x-label": "Request Body",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "Commit Message",
+                "x-ask-user": true,
+                "description": "Commit message."
+              },
+              "content": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "File Content (Base64)",
+                "x-ask-user": true,
+                "description": "New file contents encoded as Base64."
+              },
+              "sha": {
+                "type": "string",
+                "x-label": "File SHA",
+                "x-ask-user": true,
+                "description": "Required when updating an existing file. The blob SHA of the file to replace."
+              },
+              "branch": {
+                "type": "string",
+                "x-label": "Branch",
+                "x-ask-user": true,
+                "description": "Branch name to write to. Defaults to the repository's default branch."
+              },
+              "committer": {
+                "type": "object",
+                "x-label": "Committer",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-label": "Committer Name",
+                    "description": "Display name for the commit identity."
+                  },
+                  "email": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-label": "Committer Email",
+                    "description": "Email address for the commit identity."
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "description": "Optional committer identity object. If provided, include name and email."
+              },
+              "author": {
+                "type": "object",
+                "x-label": "Author",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-label": "Author Name",
+                    "description": "Display name for the commit identity."
+                  },
+                  "email": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-label": "Author Email",
+                    "description": "Email address for the commit identity."
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "description": "Optional author identity object. If provided, include name and email."
+              }
+            },
+            "required": [
+              "message",
+              "content"
+            ],
+            "description": "Create or update file request body. Updating an existing file requires sha. Writing under .github/workflows may also require the workflow OAuth scope in addition to repo."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.delete_file",
+      "name": "Delete File",
+      "description": "Delete a file from a repository.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "DELETE",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/repos/[^/]+/[^/]+/contents/.+",
+            "x-label": "Contents URL",
+            "x-ask-user": true,
+            "description": "Contents URL for the target file."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "body": {
+            "type": "object",
+            "x-label": "Request Body",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "Commit Message",
+                "x-ask-user": true,
+                "description": "Commit message for the deletion."
+              },
+              "sha": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "File SHA",
+                "x-ask-user": true,
+                "description": "Blob SHA of the file being deleted."
+              },
+              "branch": {
+                "type": "string",
+                "x-label": "Branch",
+                "x-ask-user": true,
+                "description": "Branch name to delete from. Defaults to the repository's default branch."
+              },
+              "committer": {
+                "type": "object",
+                "x-label": "Committer",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-label": "Committer Name",
+                    "description": "Display name for the commit identity."
+                  },
+                  "email": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-label": "Committer Email",
+                    "description": "Email address for the commit identity."
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "description": "Optional committer identity object. If provided, include name and email."
+              },
+              "author": {
+                "type": "object",
+                "x-label": "Author",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-label": "Author Name",
+                    "description": "Display name for the commit identity."
+                  },
+                  "email": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-label": "Author Email",
+                    "description": "Email address for the commit identity."
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "description": "Optional author identity object. If provided, include name and email."
+              }
+            },
+            "required": [
+              "message",
+              "sha"
+            ],
+            "description": "Delete file request body. Deleting under .github/workflows may also require the workflow OAuth scope in addition to repo."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.list_issues",
+      "name": "List Issues",
+      "description": "List issues for a repository. Read assignee data from the assignees array rather than depending on the older singular assignee field.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/repos/[^/]+/[^/]+/issues$",
+            "x-label": "Issues URL",
+            "x-ask-user": true,
+            "description": "Issues URL for the repository."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "queryParams": {
+            "type": "object",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "closed",
+                  "all"
+                ],
+                "x-label": "State",
+                "x-ask-user": true,
+                "description": "Filter by state. Defaults to open."
+              },
+              "labels": {
+                "type": "string",
+                "x-label": "Labels",
+                "x-ask-user": true,
+                "description": "Comma-separated list of label names."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "updated",
+                  "comments"
+                ],
+                "x-label": "Sort By",
+                "x-ask-user": true,
+                "description": "Field used to sort results."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "x-label": "Sort Direction",
+                "x-ask-user": true,
+                "description": "Sort direction."
+              },
+              "since": {
+                "type": "string",
+                "format": "date-time",
+                "x-label": "Since",
+                "x-ask-user": true,
+                "description": "Only show issues updated at or after this ISO 8601 timestamp."
+              },
+              "per_page": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 30,
+                "x-label": "Results Per Page",
+                "x-ask-user": true,
+                "description": "Results per page. Maximum 100."
+              },
+              "page": {
+                "type": "number",
+                "minimum": 1,
+                "default": 1,
+                "x-label": "Page Number",
+                "x-ask-user": true,
+                "description": "Page number for pagination."
+              }
+            },
+            "description": "Optional query string parameters for filtering and pagination."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.create_issue",
+      "name": "Create Issue",
+      "description": "Create a new issue in a repository. GitHub issue responses should be read from the assignees array rather than depending on the older singular assignee field.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/repos/[^/]+/[^/]+/issues$",
+            "x-label": "Issues URL",
+            "x-ask-user": true,
+            "description": "Issues URL for the repository."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "body": {
+            "type": "object",
+            "x-label": "Request Body",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "Issue Title",
+                "x-ask-user": true,
+                "description": "Issue title."
+              },
+              "body": {
+                "type": "string",
+                "x-label": "Issue Body",
+                "x-ask-user": true,
+                "description": "Issue body in Markdown."
+              },
+              "assignees": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "x-label": "Assignees",
+                "x-ask-user": true,
+                "description": "Usernames to assign."
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
+                "x-label": "Labels",
+                "x-ask-user": true,
+                "description": "Issue labels."
+              },
+              "milestone": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "x-label": "Milestone",
+                "x-ask-user": true,
+                "description": "Milestone number."
+              }
+            },
+            "required": [
+              "title"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.list_pull_requests",
+      "name": "List Pull Requests",
+      "description": "List pull requests for a repository.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/repos/[^/]+/[^/]+/pulls$",
+            "x-label": "Pull Requests URL",
+            "x-ask-user": true,
+            "description": "Pull requests URL for the repository."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "queryParams": {
+            "type": "object",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "closed",
+                  "all"
+                ],
+                "x-label": "State",
+                "x-ask-user": true,
+                "description": "Filter by state. Defaults to open."
+              },
+              "head": {
+                "type": "string",
+                "x-label": "Head Branch",
+                "x-ask-user": true,
+                "description": "Filter by head user or head organization and branch name."
+              },
+              "base": {
+                "type": "string",
+                "x-label": "Base Branch",
+                "x-ask-user": true,
+                "description": "Filter by base branch name."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "updated",
+                  "popularity",
+                  "long-running"
+                ],
+                "x-label": "Sort By",
+                "x-ask-user": true,
+                "description": "Field used to sort results."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "x-label": "Sort Direction",
+                "x-ask-user": true,
+                "description": "Sort direction."
+              },
+              "per_page": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 30,
+                "x-label": "Results Per Page",
+                "x-ask-user": true,
+                "description": "Results per page. Maximum 100."
+              },
+              "page": {
+                "type": "number",
+                "minimum": 1,
+                "default": 1,
+                "x-label": "Page Number",
+                "x-ask-user": true,
+                "description": "Page number for pagination."
+              }
+            },
+            "description": "Optional query string parameters for filtering and pagination."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.create_pull_request",
+      "name": "Create Pull Request",
+      "description": "Create a pull request in a repository. Avoid depending on deprecated null placeholder response fields and instead read the documented current response shape.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://api\\.github\\.com/repos/[^/]+/[^/]+/pulls$",
+            "x-label": "Pull Requests URL",
+            "x-ask-user": true,
+            "description": "Pull requests URL for the repository."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "body": {
+            "type": "object",
+            "x-label": "Request Body",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "x-label": "Pull Request Title",
+                "x-ask-user": true,
+                "description": "Pull request title. Required unless issue is provided."
+              },
+              "issue": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "x-label": "Issue Number",
+                "x-ask-user": true,
+                "description": "Optional existing issue number to convert into a pull request. If provided, title may be omitted."
+              },
+              "body": {
+                "type": "string",
+                "x-label": "Pull Request Body",
+                "x-ask-user": true,
+                "description": "Pull request body in Markdown."
+              },
+              "head": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "Head Branch",
+                "x-ask-user": true,
+                "description": "Name of the branch where your changes are implemented."
+              },
+              "base": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "Base Branch",
+                "x-ask-user": true,
+                "description": "Name of the branch you want the changes pulled into."
+              },
+              "head_repo": {
+                "type": "string",
+                "x-label": "Head Repository",
+                "x-ask-user": true,
+                "description": "Optional head repository name when both branches are in organizations owned by the same user or org."
+              },
+              "draft": {
+                "type": "boolean",
+                "default": false,
+                "x-label": "Draft",
+                "x-ask-user": true,
+                "description": "Whether to open the pull request as a draft."
+              },
+              "maintainer_can_modify": {
+                "type": "boolean",
+                "default": true,
+                "x-label": "Maintainer Can Modify",
+                "x-ask-user": true,
+                "description": "Allow maintainers to modify the pull request branch."
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "title",
+                  "head",
+                  "base"
+                ]
+              },
+              {
+                "required": [
+                  "issue",
+                  "head",
+                  "base"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.search_repositories",
+      "name": "Search Repositories",
+      "description": "Search public and accessible repositories.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.github.com/search/repositories",
+            "x-label": "API URL",
+            "description": "Full GitHub API URL for searching repositories."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "queryParams": {
+            "type": "object",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "q": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "Search Query",
+                "x-ask-user": true,
+                "description": "GitHub repository search query."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "stars",
+                  "forks",
+                  "help-wanted-issues",
+                  "updated"
+                ],
+                "x-label": "Sort By",
+                "x-ask-user": true,
+                "description": "Optional sort field."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "x-label": "Sort Order",
+                "x-ask-user": true,
+                "description": "Sort order."
+              },
+              "per_page": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 30,
+                "x-label": "Results Per Page",
+                "x-ask-user": true,
+                "description": "Results per page. Maximum 100."
+              },
+              "page": {
+                "type": "number",
+                "minimum": 1,
+                "default": 1,
+                "x-label": "Page Number",
+                "x-ask-user": true,
+                "description": "Page number for pagination."
+              }
+            },
+            "required": [
+              "q"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "queryParams"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.search_issues",
+      "name": "Search Issues And Pull Requests",
+      "description": "Search issues and pull requests across accessible repositories.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.github.com/search/issues",
+            "x-label": "API URL",
+            "description": "Full GitHub API URL for searching issues and pull requests."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          },
+          "queryParams": {
+            "type": "object",
+            "x-label": "Query Parameters",
+            "x-ask-user": true,
+            "additionalProperties": false,
+            "properties": {
+              "q": {
+                "type": "string",
+                "minLength": 1,
+                "x-label": "Search Query",
+                "x-ask-user": true,
+                "description": "GitHub issue and pull request search query."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "comments",
+                  "reactions",
+                  "reactions-+1",
+                  "reactions--1",
+                  "reactions-smile",
+                  "reactions-thinking_face",
+                  "reactions-heart",
+                  "reactions-tada",
+                  "interactions",
+                  "created",
+                  "updated"
+                ],
+                "x-label": "Sort By",
+                "x-ask-user": true,
+                "description": "Optional sort field."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "x-label": "Sort Order",
+                "x-ask-user": true,
+                "description": "Sort order."
+              },
+              "per_page": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 30,
+                "x-label": "Results Per Page",
+                "x-ask-user": true,
+                "description": "Results per page. Maximum 100."
+              },
+              "page": {
+                "type": "number",
+                "minimum": 1,
+                "default": 1,
+                "x-label": "Page Number",
+                "x-ask-user": true,
+                "description": "Page number for pagination."
+              }
+            },
+            "required": [
+              "q"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "queryParams"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "github.get_rate_limit",
+      "name": "Get Rate Limits",
+      "description": "Get the current rate limit status for the authenticated user. Prefer the resources object, especially resources.core, instead of depending on deprecated top-level rate fields.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "x-label": "Connection ID",
+            "x-ask-user": true,
+            "description": "Connection id for the authorized GitHub account"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET",
+            "x-label": "HTTP Method",
+            "description": "HTTP method for the GitHub API call."
+          },
+          "url": {
+            "type": "string",
+            "const": "https://api.github.com/rate_limit",
+            "x-label": "API URL",
+            "description": "Full GitHub API URL for rate limit status."
+          },
+          "headers": {
+            "type": "object",
+            "x-label": "HTTP Headers",
+            "x-ask-user": true,
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "default": "application/vnd.github+json",
+                "description": "GitHub media type header. Use application/vnd.github+json for the current stable API."
+              },
+              "X-GitHub-Api-Version": {
+                "type": "string",
+                "default": "2022-11-28",
+                "description": "GitHub REST API version header. 2022-11-28 is the current stable version recommended for production."
+              },
+              "User-Agent": {
+                "type": "string",
+                "description": "Valid User-Agent header for GitHub API requests, for example Zaprun-GitHub-Plugin. Required by GitHub."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Accept",
+              "X-GitHub-Api-Version",
+              "User-Agent"
+            ],
+            "description": "HTTP headers for the GitHub API request. Authorization is injected automatically from the connection. Include Accept, X-GitHub-Api-Version, and User-Agent."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Raw JSON response body returned by the GitHub API."
+      },
+      "requiresConnection": true
+    }
+  ]
+}

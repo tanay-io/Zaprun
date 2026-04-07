@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { prisma } from "../../../db/prisma";
 import {
+  buildOAuthTokenRequest,
   getOAuthConfig,
   getProviderOAuthEnvironment,
   parseScopes,
@@ -104,10 +105,17 @@ router.get("/auth/:providerKey/start", async (req, res) => {
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("client_id", providerEnv.clientId);
   authUrl.searchParams.set("redirect_uri", providerEnv.redirectUri);
-  authUrl.searchParams.set("scope", oauthConfig.scopes.join(" "));
   authUrl.searchParams.set("state", state);
-  authUrl.searchParams.set("code_challenge", codeChallenge);
-  authUrl.searchParams.set("code_challenge_method", "S256");
+  if (oauthConfig.scopes.length > 0) {
+    authUrl.searchParams.set("scope", oauthConfig.scopes.join(" "));
+  }
+  for (const [key, value] of Object.entries(oauthConfig.authorizationParams ?? {})) {
+    authUrl.searchParams.set(key, value);
+  }
+  if (oauthConfig.pkce !== false) {
+    authUrl.searchParams.set("code_challenge", codeChallenge);
+    authUrl.searchParams.set("code_challenge_method", "S256");
+  }
 
   return res.redirect(authUrl.toString());
 });
@@ -188,25 +196,24 @@ router.get("/auth/:providerKey/callback", async (req, res) => {
     });
   }
 
-  const tokenRequestBody = new URLSearchParams();
-  tokenRequestBody.set("grant_type", "authorization_code");
-  tokenRequestBody.set("code", code);
-  tokenRequestBody.set("client_id", providerEnv.clientId);
-  tokenRequestBody.set("redirect_uri", oauthSession.redirectUri);
-  tokenRequestBody.set("code_verifier", codeVerifier);
-  if (providerEnv.clientSecret) {
-    tokenRequestBody.set("client_secret", providerEnv.clientSecret);
-  }
+  const tokenRequest = buildOAuthTokenRequest(
+    oauthConfig,
+    providerEnv,
+    {
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: oauthSession.redirectUri,
+      ...(oauthConfig.pkce !== false ? { code_verifier: codeVerifier } : {}),
+    },
+  );
 
   let tokenPayload: Record<string, unknown>;
   try {
     const tokenResponse = await axios.post(
       oauthConfig.tokenUrl,
-      tokenRequestBody.toString(),
+      tokenRequest.body,
       {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers: tokenRequest.headers,
       },
     );
     tokenPayload = parseTokenResponse(tokenResponse.data);

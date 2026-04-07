@@ -15,6 +15,11 @@ export type ProviderOAuthEnvironment = {
   redirectUri?: string;
 };
 
+type OAuthTokenRequest = {
+  body: string;
+  headers: Record<string, string>;
+};
+
 type OAuthTokenData = {
   accessToken: string;
   tokenType?: string | null;
@@ -125,6 +130,57 @@ export function getOAuthConfig(providerKey: string): OAuth2AuthConfig | null {
   return manifest.authConfig;
 }
 
+function toBasicAuthHeader(clientId: string, clientSecret?: string): string {
+  const encoded = Buffer.from(`${clientId}:${clientSecret ?? ""}`, "utf8").toString(
+    "base64",
+  );
+  return `Basic ${encoded}`;
+}
+
+export function buildOAuthTokenRequest(
+  oauthConfig: OAuth2AuthConfig,
+  providerEnv: ProviderOAuthEnvironment,
+  params: Record<string, string>,
+): OAuthTokenRequest {
+  if (!providerEnv.clientId) {
+    throw new Error("Missing OAuth client id");
+  }
+
+  const tokenRequestFormat = oauthConfig.tokenRequestFormat ?? "form";
+  const tokenAuthMethod = oauthConfig.tokenAuthMethod ?? "body";
+  const payload: Record<string, string> = { ...params };
+
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+
+  if (tokenAuthMethod === "basic") {
+    headers.Authorization = toBasicAuthHeader(
+      providerEnv.clientId,
+      providerEnv.clientSecret,
+    );
+  } else {
+    payload.client_id = providerEnv.clientId;
+    if (providerEnv.clientSecret) {
+      payload.client_secret = providerEnv.clientSecret;
+    }
+  }
+
+  if (tokenRequestFormat === "json") {
+    headers["Content-Type"] = "application/json";
+    return {
+      body: JSON.stringify(payload),
+      headers,
+    };
+  }
+
+  headers["Content-Type"] = "application/x-www-form-urlencoded";
+  return {
+    body: new URLSearchParams(payload).toString(),
+    headers,
+  };
+}
+
 function parseOAuthAuthData(
   connection: Pick<Connection, "provider" | "authData">,
 ): OAuthTokenData {
@@ -228,21 +284,15 @@ export async function refreshOAuthToken(
   }
 
   const providerEnv = getRequiredProviderOAuthEnvironment(connection.provider);
-
-  const body = new URLSearchParams();
-  body.set("grant_type", "refresh_token");
-  body.set("refresh_token", refreshToken);
-  body.set("client_id", providerEnv.clientId);
-  if (providerEnv.clientSecret) {
-    body.set("client_secret", providerEnv.clientSecret);
-  }
+  const tokenRequest = buildOAuthTokenRequest(oauthConfig, providerEnv, {
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
 
   let tokenPayload: Record<string, unknown>;
   try {
-    const response = await axios.post(tokenEndpoint, body.toString(), {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
+    const response = await axios.post(tokenEndpoint, tokenRequest.body, {
+      headers: tokenRequest.headers,
       validateStatus: () => true,
     });
 

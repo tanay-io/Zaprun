@@ -4,6 +4,7 @@ import { Connection } from "@prisma/client";
 import { ProviderManifest, ActionManifest } from "../types/manifest";
 import { Executor } from "../executors/types";
 import { logger } from "../utils/logger";
+import { prisma } from "../db/prisma";
 
 export type ConnectionTestResult = {
   healthy: boolean;
@@ -28,6 +29,66 @@ const executorIndex = new Map<string, Executor>();
 const actionManifestIndex = new Map<string, ActionManifest>();
 
 const connectionTesterIndex = new Map<string, ConnectionTester>();
+
+async function syncManifestCatalog(manifest: ProviderManifest): Promise<void> {
+  const provider = await prisma.availableProvider.upsert({
+    where: { key: manifest.key },
+    update: {
+      name: manifest.name,
+      description: manifest.description,
+      iconUrl: manifest.iconUrl,
+      docsUrl: manifest.docsUrl,
+      authTypes: [manifest.authType],
+      authConfig: manifest.authConfig as any,
+      status: "active",
+    },
+    create: {
+      key: manifest.key,
+      name: manifest.name,
+      description: manifest.description,
+      iconUrl: manifest.iconUrl,
+      docsUrl: manifest.docsUrl,
+      authTypes: [manifest.authType],
+      authConfig: manifest.authConfig as any,
+      status: "active",
+    },
+    select: { id: true },
+  });
+
+  for (const trigger of manifest.triggers) {
+    await prisma.availableTrigger.upsert({
+      where: { key: trigger.key },
+      update: {
+        name: trigger.name,
+        schema: trigger.outputSchema as any,
+        availableProviderId: provider.id,
+      },
+      create: {
+        key: trigger.key,
+        name: trigger.name,
+        schema: trigger.outputSchema as any,
+        availableProviderId: provider.id,
+      },
+    });
+  }
+
+  for (const action of manifest.actions) {
+    await prisma.availableAction.upsert({
+      where: { key: action.key },
+      update: {
+        name: action.name,
+        schema: action.inputSchema as any,
+        availableProviderId: provider.id,
+      },
+      create: {
+        key: action.key,
+        name: action.name,
+        schema: action.inputSchema as any,
+        availableProviderId: provider.id,
+      },
+    });
+  }
+}
 
 export async function loadPlugins(): Promise<void> {
   registry.clear();
@@ -78,6 +139,7 @@ export async function loadPlugins(): Promise<void> {
         connectionTesterIndex.set(manifest.key, testConnection);
       }
 
+      await syncManifestCatalog(manifest);
       registry.set(manifest.key, { manifest, executors, testConnection });
 
       logger.info(

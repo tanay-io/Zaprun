@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/server.js",
+  "bin": {
+    "zap": "./dist/cli/index.js"
+  },
   "scripts": {
     "build": "tsc -p .",
     "start": "node dist/server.js",
@@ -17,14 +20,21 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/adapter-pg": "6.19.2",
     "@prisma/client": "6.19.2",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "axios": "^1.13.2",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.1",
     "crypto": "^1.0.1",
     "express": "^5.2.1",
+    "inquirer": "^12.10.0",
     "kafkajs": "^2.2.4",
+    "open": "^10.2.0",
+    "ora": "^9.0.0",
     "pg": "^8.16.3",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",

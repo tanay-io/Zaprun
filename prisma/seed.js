@@ -72,7 +72,7 @@ async function main() {
         id: "ego-test-action-1",
         zapId: zap.id,
         availableActionId: availableAction.id,
-        stepOrder: 1,
+        stepOrder: 0,
         config: {
           method: "GET",
           url: "https://jsonplaceholder.typicode.com/todos/1",
@@ -82,7 +82,7 @@ async function main() {
         id: "ego-test-action-2",
         zapId: zap.id,
         availableActionId: availableAction.id,
-        stepOrder: 2,
+        stepOrder: 1,
         config: {
           method: "GET",
           url: "https://httpstat.us/401",
@@ -92,7 +92,7 @@ async function main() {
         id: "ego-test-action-3",
         zapId: zap.id,
         availableActionId: availableAction.id,
-        stepOrder: 3,
+        stepOrder: 2,
         config: {
           method: "GET",
           url: "https://jsonplaceholder.typicode.com/posts/1",
@@ -101,10 +101,72 @@ async function main() {
     ],
   });
 
+  const zapVersion = await prisma.zapVersion.upsert({
+    where: {
+      zapId_versionNumber: {
+        zapId: zap.id,
+        versionNumber: 1,
+      },
+    },
+    update: {},
+    create: {
+      zapId: zap.id,
+      versionNumber: 1,
+    },
+  });
+
+  await prisma.zap.update({
+    where: { id: zap.id },
+    data: { latestVersionId: zapVersion.id },
+  });
+
+  await prisma.zapVersionStep.deleteMany({
+    where: { zapVersionId: zapVersion.id },
+  });
+
+  await prisma.zapVersionStep.createMany({
+    data: [
+      {
+        zapVersionId: zapVersion.id,
+        stepIndex: 0,
+        actionKey: "http",
+        config: {
+          method: "GET",
+          url: "https://jsonplaceholder.typicode.com/todos/1",
+        },
+        inputSchema: {},
+        outputSchema: {},
+      },
+      {
+        zapVersionId: zapVersion.id,
+        stepIndex: 1,
+        actionKey: "http",
+        config: {
+          method: "GET",
+          url: "https://httpstat.us/401",
+        },
+        inputSchema: {},
+        outputSchema: {},
+      },
+      {
+        zapVersionId: zapVersion.id,
+        stepIndex: 2,
+        actionKey: "http",
+        config: {
+          method: "GET",
+          url: "https://jsonplaceholder.typicode.com/posts/1",
+        },
+        inputSchema: {},
+        outputSchema: {},
+      },
+    ],
+  });
+
   await prisma.zapRun.upsert({
     where: { id: "ego-test-run" },
     update: {
       zapId: zap.id,
+      zapVersionId: zapVersion.id,
       triggerPayload: { source: "seed" },
       status: "pending",
       failedStepId: null,
@@ -114,6 +176,7 @@ async function main() {
     create: {
       id: "ego-test-run",
       zapId: zap.id,
+      zapVersionId: zapVersion.id,
       triggerPayload: { source: "seed" },
       status: "pending",
       failedStepId: null,

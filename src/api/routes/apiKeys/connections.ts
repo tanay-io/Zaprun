@@ -162,6 +162,7 @@ router.get("/connections", async (req, res) => {
       status: true,
       scopes: true,
       expiresAt: true,
+      updatedAt: true,
     },
   });
 
@@ -173,6 +174,7 @@ router.get("/connections", async (req, res) => {
         getManifest(connection.provider)?.name ?? connection.provider,
       scopes: connection.scopes,
       expiresAt: connection.expiresAt,
+      updatedAt: connection.updatedAt,
       healthy: connection.status === "active",
     })),
   });
