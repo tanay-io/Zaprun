@@ -238,7 +238,10 @@ function parseJsonWithDiagnostics(text: string): AnyObject {
     const index = match ? Number(match[1]) : -1;
     const snippet =
       index >= 0
-        ? text.slice(Math.max(0, index - 160), Math.min(text.length, index + 160))
+        ? text.slice(
+            Math.max(0, index - 160),
+            Math.min(text.length, index + 160),
+          )
         : text.slice(0, 320);
 
     throw new Error(
@@ -295,6 +298,23 @@ function buildDocsSection(providerKey: string): string {
 - https://developers.notion.com/reference/request-limits`;
   }
 
+  if (normalized === "slack") {
+    return `DOCS TO USE
+- https://docs.slack.dev/apis/web-api/
+- https://docs.slack.dev/apis/events-api/
+- https://docs.slack.dev/apis/events-api/using-http-request-urls/
+- https://docs.slack.dev/authentication/installing-with-oauth/
+- https://docs.slack.dev/reference/methods/oauth.v2.access/
+- https://docs.slack.dev/reference/methods/chat.postMessage/
+- https://docs.slack.dev/reference/methods/chat.update/
+- https://docs.slack.dev/reference/methods/conversations.list/
+- https://docs.slack.dev/reference/methods/conversations.create/
+- https://docs.slack.dev/reference/methods/conversations.invite/
+- https://docs.slack.dev/reference/methods/users.lookupByEmail/
+- https://docs.slack.dev/reference/methods/files.getUploadURLExternal/
+- https://docs.slack.dev/reference/methods/files.completeUploadExternal/`;
+  }
+
   return `DOCS TO USE
 - Official API reference, authentication, versioning, error handling, limits, and endpoint docs for ${providerKey}.`;
 }
@@ -344,6 +364,25 @@ PROVIDER-SPECIFIC ENRICHMENT NOTES
 - Keep existing method, url, and header fields intact unless clearly wrong.`;
   }
 
+  if (normalized === "slack") {
+    return `PRIMARY GROUNDING RULES
+1) Treat official Slack docs as source of truth and ignore stale model memory.
+2) First read the linked Slack docs and verify current behavior for Web API, OAuth v2, and Events API payloads.
+3) Use current documented request/response behavior instead of assumptions from older Slack APIs.
+4) If docs are unclear, keep schema flexible instead of inventing strict enums or constraints.
+
+VERSIONING REQUIREMENTS (IMPORTANT)
+- Slack Web API does not require a per-request API version header; do not invent one.
+- Keep existing auth and endpoint guidance aligned with docs: OAuth token exchange and Web API bearer token usage.
+- Mark deprecated or legacy fields only when the docs explicitly identify them.
+
+PROVIDER-SPECIFIC ENRICHMENT NOTES
+- Preserve the existing action keys and top-level manifest shape, including triggers.
+- Preserve Slack Events API envelope support, including url_verification challenge payloads.
+- Keep method, url, headers, queryParams, and body compatible with the shared HTTP executor contract.
+- Keep connectionId and OAuth assumptions intact; do not add token fields to action inputs.`;
+  }
+
   return `PRIMARY GROUNDING RULES
 1) Treat official docs as source of truth and ignore stale model memory.
 2) Prefer the latest stable production behavior expected in 2026.
@@ -370,7 +409,12 @@ function buildPrompt(
       ? `VERSION ENFORCEMENT
 - GitHub: MUST use the latest version from docs.
 - If X-GitHub-Api-Version is outdated -> REJECT it.`
-      : `VERSION ENFORCEMENT
+      : normalized === "slack"
+        ? `VERSION ENFORCEMENT
+- Slack: DO NOT invent API version headers.
+- Keep Slack API URLs and OAuth token exchange behavior aligned with official docs.
+- If docs indicate method-specific payload changes, apply them without changing action keys.`
+        : `VERSION ENFORCEMENT
 - Use the latest versioning guidance from the official docs.
 - If the manifest contains an outdated version field or deprecated version recommendation, correct it from the docs.`;
 
@@ -455,6 +499,24 @@ function compactManifestForPrompt(manifest: AnyObject): string {
   return JSON.stringify(manifest);
 }
 
+function restoreMissingTopLevelSections(
+  rawManifest: AnyObject,
+  enrichedManifest: AnyObject,
+): AnyObject {
+  const merged: AnyObject = { ...enrichedManifest };
+
+  if (
+    Array.isArray(rawManifest?.triggers) &&
+    rawManifest.triggers.length > 0 &&
+    (!Array.isArray(enrichedManifest?.triggers) ||
+      enrichedManifest.triggers.length === 0)
+  ) {
+    merged.triggers = rawManifest.triggers;
+  }
+
+  return merged;
+}
+
 function extractAssistantText(data: any): string {
   const choice = data?.choices?.[0];
   const content = choice?.message?.content;
@@ -486,7 +548,9 @@ function extractAssistantText(data: any): string {
   }
 
   if (typeof choice?.message?.refusal === "string" && choice.message.refusal) {
-    throw new Error(`OpenRouter model refused the request: ${choice.message.refusal}`);
+    throw new Error(
+      `OpenRouter model refused the request: ${choice.message.refusal}`,
+    );
   }
 
   if (typeof choice?.text === "string" && choice.text.trim()) {
@@ -499,8 +563,7 @@ function extractAssistantText(data: any): string {
 
   const debugShape = {
     topLevelKeys: data && typeof data === "object" ? Object.keys(data) : [],
-    choiceKeys:
-      choice && typeof choice === "object" ? Object.keys(choice) : [],
+    choiceKeys: choice && typeof choice === "object" ? Object.keys(choice) : [],
     messageKeys:
       choice?.message && typeof choice.message === "object"
         ? Object.keys(choice.message)
@@ -617,10 +680,7 @@ export async function enrichManifestOpenRouter(providerKey: string) {
     }
 
     if (response.status === 429 && attempt < MAX_RETRIES) {
-      const delayMs = getRetryDelayMs(
-        attempt,
-        response.headers["retry-after"],
-      );
+      const delayMs = getRetryDelayMs(attempt, response.headers["retry-after"]);
       console.warn(
         `OpenRouter rate-limited request attempt ${attempt}/${MAX_RETRIES}. Retrying in ${Math.ceil(delayMs / 1000)}s...`,
       );
@@ -648,11 +708,12 @@ export async function enrichManifestOpenRouter(providerKey: string) {
   const assistantText = extractAssistantText(response.data);
   const jsonText = extractJsonObject(assistantText);
   const parsed = parseJsonWithDiagnostics(jsonText);
+  const hydrated = restoreMissingTopLevelSections(rawManifest, parsed);
 
   const finalManifest =
     providerKey.toLowerCase() === "notion"
-      ? normalizeNotionTo2026(parsed)
-      : parsed;
+      ? normalizeNotionTo2026(hydrated)
+      : hydrated;
 
   const enriched = JSON.stringify(finalManifest, null, 2);
   const outPath = path.resolve(

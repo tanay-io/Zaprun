@@ -44,6 +44,26 @@ const genericOutputSchema = {
   description: "Raw JSON response body returned by the GitHub API.",
 } as const;
 
+const githubWebhookOutputSchema = {
+  type: "object",
+  properties: {
+    event: {
+      type: "string",
+      description: "GitHub webhook event type from X-GitHub-Event.",
+    },
+    deliveryId: {
+      type: "string",
+      description: "Unique delivery id from X-GitHub-Delivery.",
+    },
+    payload: {
+      type: "object",
+      description: "Raw GitHub webhook payload JSON.",
+    },
+  },
+  additionalProperties: true,
+  description: "Normalized GitHub webhook payload received by Zaprun.",
+} as const;
+
 const gitIdentitySchema = {
   type: "object",
   additionalProperties: false,
@@ -97,7 +117,16 @@ export const githubManifest: ProviderManifest = {
     tokenAuthMethod: "body",
     tokenRequestFormat: "form",
   },
-  triggers: [],
+  triggers: [
+    {
+      key: "github.webhook",
+      name: "GitHub Webhook",
+      description:
+        "Receive GitHub webhook events through Zaprun at POST /webhook/:zapId. Trigger config can include secret and events filters.",
+      triggerType: "webhook",
+      outputSchema: githubWebhookOutputSchema,
+    },
+  ],
   actions: [
     githubAction(
       "github.api_request",

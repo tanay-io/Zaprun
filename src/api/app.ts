@@ -9,6 +9,7 @@ import { logger } from "../utils/logger";
 import { prisma } from "../db/prisma";
 
 const app = express();
+app.use(webhookRouter);
 app.use(express.json());
 
 app.get("/health", (req, res) => {
@@ -46,7 +47,6 @@ app.get("/me", async (req, res) => {
   return res.status(200).json({ user });
 });
 
-app.use(webhookRouter);
 app.use(zapsRouter);
 app.use(zapRunsRouter);
 app.use(providersRouter);

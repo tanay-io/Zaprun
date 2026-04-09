@@ -1,0 +1,1040 @@
+{
+  "key": "slack",
+  "name": "Slack",
+  "description": "Send authenticated requests to the Slack Web API for messaging, conversations, users, and files.",
+  "iconUrl": "https://a.slack-edge.com/80588/marketing/img/meta/slack_hash_256.png",
+  "docsUrl": "https://docs.slack.dev/",
+  "authType": "oauth2",
+  "authConfig": {
+    "type": "oauth2",
+    "authorizationUrl": "https://slack.com/oauth/v2/authorize",
+    "tokenUrl": "https://slack.com/api/oauth.v2.access",
+    "scopes": [
+      "chat:write",
+      "channels:read",
+      "channels:write",
+      "channels:write.invites",
+      "groups:read",
+      "groups:write",
+      "im:read",
+      "mpim:read",
+      "users:read.email",
+      "files:write"
+    ],
+    "pkce": false,
+    "tokenAuthMethod": "basic",
+    "tokenRequestFormat": "form"
+  },
+  "triggers": [
+    {
+      "key": "slack.events_webhook",
+      "name": "Slack Events Webhook",
+      "description": "Receive Slack Events API payloads over HTTP. Payload includes event_callback envelopes and url_verification challenge requests.",
+      "triggerType": "webhook",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Outer event type, such as event_callback or url_verification."
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Workspace id where the event occurred."
+          },
+          "api_app_id": {
+            "type": "string",
+            "description": "Slack app id receiving the event."
+          },
+          "event_id": {
+            "type": "string",
+            "description": "Globally unique event id."
+          },
+          "event_time": {
+            "type": "number",
+            "description": "Unix epoch timestamp of dispatch time."
+          },
+          "challenge": {
+            "type": "string",
+            "description": "Slack URL verification challenge value for url_verification requests."
+          },
+          "event": {
+            "type": "object",
+            "description": "Inner Slack event payload.",
+            "additionalProperties": true
+          },
+          "authorizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Installations visible to the event."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Slack Events API event envelope."
+      }
+    }
+  ],
+  "actions": [
+    {
+      "key": "slack.api_request",
+      "name": "Slack API Request",
+      "description": "Call any Slack Web API endpoint with a raw HTTP configuration.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "description": "HTTP method for the Slack API call."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "pattern": "^https://slack\\.com/api/",
+            "description": "Full Slack API URL."
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "queryParams": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "description": "Optional query string parameters."
+          },
+          "body": {
+            "description": "Optional JSON body. Tokens should not be sent in body because Authorization is injected automatically."
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "slack.post_message",
+      "name": "Post Message",
+      "description": "Send a message to a conversation using chat.postMessage.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://slack.com/api/chat.postMessage"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "channel": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Channel, private channel, MPIM, IM, or user id depending on context.",
+                "x-ask-user": true,
+                "x-label": "Channel ID"
+              },
+              "text": {
+                "type": "string",
+                "description": "Message text. Recommended as fallback text when blocks are used.",
+                "x-ask-user": true,
+                "x-label": "Message Text"
+              },
+              "blocks": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Block Kit array for rich messages.",
+                "x-ask-user": true,
+                "x-label": "Blocks"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Legacy attachments array. Prefer using blocks instead.",
+                "x-ask-user": true,
+                "x-label": "Attachments (Legacy)"
+              },
+              "thread_ts": {
+                "type": "string",
+                "description": "Parent message ts to post as a reply.",
+                "x-ask-user": true,
+                "x-label": "Thread Timestamp"
+              },
+              "reply_broadcast": {
+                "type": "boolean",
+                "description": "Broadcast a threaded reply to channel.",
+                "x-ask-user": true,
+                "x-label": "Reply Broadcast"
+              },
+              "unfurl_links": {
+                "type": "boolean",
+                "description": "Set to false to disable unfurling of links.",
+                "x-ask-user": true,
+                "x-label": "Unfurl Links"
+              },
+              "unfurl_media": {
+                "type": "boolean",
+                "description": "Set to false to disable unfurling of media content.",
+                "x-ask-user": true,
+                "x-label": "Unfurl Media"
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Message metadata.",
+                "x-ask-user": true,
+                "x-label": "Metadata"
+              }
+            },
+            "required": [
+              "channel"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "slack.update_message",
+      "name": "Update Message",
+      "description": "Update a message using chat.update.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://slack.com/api/chat.update"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "channel": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Conversation id containing the target message.",
+                "x-ask-user": true,
+                "x-label": "Channel ID"
+              },
+              "ts": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp id of the message to update.",
+                "x-ask-user": true,
+                "x-label": "Message Timestamp"
+              },
+              "text": {
+                "type": "string",
+                "description": "New message text.",
+                "x-ask-user": true,
+                "x-label": "Message Text"
+              },
+              "blocks": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Block Kit array for rich messages.",
+                "x-ask-user": true,
+                "x-label": "Blocks"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Legacy attachments array. Prefer using blocks instead.",
+                "x-ask-user": true,
+                "x-label": "Attachments (Legacy)"
+              },
+              "file_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "File IDs to associate with the message.",
+                "x-ask-user": true,
+                "x-label": "File IDs"
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Message metadata.",
+                "x-ask-user": true,
+                "x-label": "Metadata"
+              }
+            },
+            "required": [
+              "channel",
+              "ts"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "slack.list_conversations",
+      "name": "List Conversations",
+      "description": "List channels and conversations visible to the token using conversations.list.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://slack.com/api/conversations.list"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "queryParams": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "cursor": {
+                "type": "string",
+                "description": "Paginate through results.",
+                "x-ask-user": true,
+                "x-label": "Cursor"
+              },
+              "exclude_archived": {
+                "type": "boolean",
+                "description": "Exclude archived channels from the list.",
+                "x-ask-user": true,
+                "x-label": "Exclude Archived"
+              },
+              "limit": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 999,
+                "description": "The maximum number of items to return.",
+                "x-ask-user": true,
+                "x-label": "Limit"
+              },
+              "team_id": {
+                "type": "string",
+                "description": "Filter by team ID.",
+                "x-ask-user": true,
+                "x-label": "Team ID"
+              },
+              "types": {
+                "type": "string",
+                "description": "Comma-separated list of conversation types: public_channel,private_channel,mpim,im.",
+                "x-ask-user": true,
+                "x-label": "Conversation Types"
+              }
+            }
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "slack.create_conversation",
+      "name": "Create Conversation",
+      "description": "Create a public or private channel using conversations.create.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://slack.com/api/conversations.create"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[a-z0-9_-]+$",
+                "description": "Channel name using lowercase letters, numbers, hyphens, and underscores.",
+                "x-ask-user": true,
+                "x-label": "Channel Name"
+              },
+              "is_private": {
+                "type": "boolean",
+                "description": "Create a private channel if true.",
+                "x-ask-user": true,
+                "x-label": "Is Private"
+              },
+              "team_id": {
+                "type": "string",
+                "description": "ID of the workspace to create the conversation in.",
+                "x-ask-user": true,
+                "x-label": "Team ID"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "slack.invite_to_conversation",
+      "name": "Invite Users To Conversation",
+      "description": "Invite users to a channel with conversations.invite.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://slack.com/api/conversations.invite"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "channel": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Channel id where users should be invited.",
+                "x-ask-user": true,
+                "x-label": "Channel ID"
+              },
+              "users": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated list of user ids to invite.",
+                "x-ask-user": true,
+                "x-label": "User IDs (comma-separated)"
+              },
+              "force": {
+                "type": "boolean",
+                "description": "When true with multiple users, valid users are invited even if some ids are invalid.",
+                "x-ask-user": true,
+                "x-label": "Force Invite"
+              }
+            },
+            "required": [
+              "channel",
+              "users"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "slack.lookup_user_by_email",
+      "name": "Lookup User By Email",
+      "description": "Find a user by email with users.lookupByEmail.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "GET"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://slack.com/api/users.lookupByEmail"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "queryParams": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email",
+                "description": "Email address belonging to a workspace user.",
+                "x-ask-user": true,
+                "x-label": "User Email"
+              }
+            },
+            "required": [
+              "email"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "queryParams"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "slack.get_upload_url_external",
+      "name": "Get Upload URL External",
+      "description": "Start external file upload with files.getUploadURLExternal.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://slack.com/api/files.getUploadURLExternal"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "filename": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Name of the file.",
+                "x-ask-user": true,
+                "x-label": "Filename"
+              },
+              "length": {
+                "type": "number",
+                "minimum": 1,
+                "description": "File size in bytes.",
+                "x-ask-user": true,
+                "x-label": "File Size (bytes)"
+              },
+              "snippet_type": {
+                "type": "string",
+                "description": "Specify the type of file snippet.",
+                "x-ask-user": true,
+                "x-label": "Snippet Type"
+              },
+              "alt_txt": {
+                "type": "string",
+                "description": "Text to use as metadata for a file upload.",
+                "x-ask-user": true,
+                "x-label": "Alt Text"
+              }
+            },
+            "required": [
+              "filename",
+              "length"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    },
+    {
+      "key": "slack.complete_upload_external",
+      "name": "Complete Upload External",
+      "description": "Finalize an upload started with files.getUploadURLExternal.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connection id for the authorized Slack workspace"
+          },
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "const": "https://slack.com/api/files.completeUploadExternal"
+          },
+          "headers": {
+            "type": "object",
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "const": "application/json",
+                "description": "Slack Web API write methods support JSON request bodies."
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "required": [
+              "Content-Type"
+            ],
+            "description": "HTTP headers for the Slack API request. Authorization is injected automatically from the connection."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "files": {
+                "type": "array",
+                "minItems": 1,
+                "description": "List of files to complete. Each file object requires an 'id'.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "ID of the file to complete.",
+                      "x-ask-user": true,
+                      "x-label": "File ID"
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Title of the file.",
+                      "x-ask-user": true,
+                      "x-label": "File Title"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              },
+              "channel_id": {
+                "type": "string",
+                "description": "ID of the channel to share the file in. Use 'channels' for multiple channels (preferred).",
+                "x-ask-user": true,
+                "x-label": "Channel ID"
+              },
+              "channels": {
+                "type": "string",
+                "description": "Comma-separated list of channel IDs or user IDs to share the file to. This is the preferred parameter.",
+                "x-ask-user": true,
+                "x-label": "Channels (comma-separated)"
+              },
+              "thread_ts": {
+                "type": "string",
+                "description": "Timestamp of the thread to share the file in.",
+                "x-ask-user": true,
+                "x-label": "Thread Timestamp"
+              },
+              "initial_comment": {
+                "type": "string",
+                "description": "Initial comment to post with the file.",
+                "x-ask-user": true,
+                "x-label": "Initial Comment"
+              },
+              "blocks": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Block Kit array for rich messages with the file.",
+                "x-ask-user": true,
+                "x-label": "Blocks"
+              }
+            },
+            "required": [
+              "files"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "method",
+          "url",
+          "headers",
+          "body"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Slack API success flag."
+          },
+          "error": {
+            "type": "string",
+            "description": "Slack error code when ok=false."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Raw JSON response body returned by the Slack API."
+      },
+      "requiresConnection": true
+    }
+  ]
+}
