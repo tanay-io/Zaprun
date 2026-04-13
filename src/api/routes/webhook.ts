@@ -43,7 +43,7 @@ function toRawBuffer(body: unknown): Buffer {
 
   return Buffer.from(JSON.stringify(body), "utf8");
 }
-
+  
 function parseJsonPayload(rawBody: Buffer): unknown {
   const text = rawBody.toString("utf8").trim();
   if (!text) {

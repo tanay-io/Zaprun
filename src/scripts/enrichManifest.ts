@@ -272,6 +272,35 @@ function buildDocsSection(providerKey: string): string {
 - https://docs.slack.dev/reference/methods/files.completeUploadExternal/`;
   }
 
+  if (normalized === "stripe") {
+    return `DOCS TO USE
+- https://docs.stripe.com/api
+- https://docs.stripe.com/api/authentication
+- https://docs.stripe.com/api/customers
+- https://docs.stripe.com/api/payment_intents/create
+- https://docs.stripe.com/api/payment_intents/confirm
+- https://docs.stripe.com/api/invoices/create
+- https://docs.stripe.com/api/invoices/finalize
+- https://docs.stripe.com/api/invoices/list
+- https://docs.stripe.com/api/invoices/pay
+- https://docs.stripe.com/webhooks
+- https://docs.stripe.com/webhooks/signature`;
+  }
+
+  if (normalized === "gmail") {
+    return `DOCS TO USE
+- https://developers.google.com/gmail/api/reference/rest
+- https://developers.google.com/gmail/api/reference/rest/v1/users.messages/list
+- https://developers.google.com/gmail/api/reference/rest/v1/users.messages/get
+- https://developers.google.com/gmail/api/reference/rest/v1/users.messages/send
+- https://developers.google.com/gmail/api/reference/rest/v1/users.messages/modify
+- https://developers.google.com/gmail/api/reference/rest/v1/users.drafts/create
+- https://developers.google.com/gmail/api/reference/rest/v1/users.threads/list
+- https://developers.google.com/gmail/api/guides/push
+- https://developers.google.com/identity/protocols/oauth2
+- https://developers.google.com/identity/protocols/oauth2/web-server`;
+  }
+
   return `DOCS TO USE
 - Official API reference, authentication, versioning, error handling, limits, and endpoint docs for ${providerKey}.`;
 }
@@ -340,6 +369,45 @@ PROVIDER-SPECIFIC ENRICHMENT NOTES
 - Keep connectionId and OAuth assumptions intact; do not add token fields to action inputs.`;
   }
 
+  if (normalized === "stripe") {
+    return `PRIMARY GROUNDING RULES
+1) Treat official Stripe docs as source of truth and ignore stale model memory.
+2) First read the linked Stripe docs and verify current behavior for API auth, request formats, and webhook event payloads.
+3) Use current documented request/response behavior instead of assumptions from old Stripe API examples.
+4) If docs are unclear, keep schema flexible instead of inventing strict enums or constraints.
+
+VERSIONING REQUIREMENTS (IMPORTANT)
+- Stripe does not require a generic per-request API version header in manifests; do not invent one.
+- Keep Authorization semantics aligned with docs: Bearer secret key in Authorization header.
+- Keep request shape guidance aligned with docs, including form-encoded request expectations for v1 endpoints.
+- Mark deprecated or legacy fields only when docs explicitly identify them.
+
+PROVIDER-SPECIFIC ENRICHMENT NOTES
+- Preserve the existing action keys and top-level manifest shape, including triggers.
+- Preserve Stripe webhook Event envelope fields (for example id, object=event, type, data.object).
+- Keep method, url, headers, queryParams, and body compatible with the shared HTTP executor contract.
+- Keep connectionId assumptions intact; do not add direct apiKey/token fields to action inputs.`;
+  }
+
+  if (normalized === "gmail") {
+    return `PRIMARY GROUNDING RULES
+1) Treat official Gmail and Google Identity docs as source of truth and ignore stale model memory.
+2) First read the linked Gmail docs and verify current behavior for OAuth, message APIs, and push notification payloads.
+3) Use current documented request/response behavior instead of assumptions from old Google API examples.
+4) If docs are unclear, keep schema flexible instead of inventing strict enums or constraints.
+
+VERSIONING REQUIREMENTS (IMPORTANT)
+- Gmail API version is represented in endpoint paths (for example /gmail/v1); do not invent required version headers.
+- Keep OAuth semantics aligned with Google Identity docs and avoid adding token fields directly into action inputs.
+- Mark deprecated or legacy fields only when docs explicitly identify them.
+
+PROVIDER-SPECIFIC ENRICHMENT NOTES
+- Preserve the existing action keys and top-level manifest shape, including triggers.
+- Preserve Gmail push notification webhook envelope support for Pub/Sub push payloads.
+- Keep method, url, headers, queryParams, and body compatible with the shared HTTP executor contract.
+- Keep connectionId and OAuth assumptions intact; do not add apiKey/token fields into action bodies.`;
+  }
+
   return `PRIMARY GROUNDING RULES
 1) Treat official docs as source of truth and ignore stale model memory.
 2) Prefer the latest stable production behavior expected in 2026.
@@ -371,7 +439,17 @@ function buildPrompt(
 - Slack: DO NOT invent API version headers.
 - Keep Slack API URLs and OAuth token exchange behavior aligned with official docs.
 - If docs indicate method-specific payload changes, apply them without changing action keys.`
-        : `VERSION ENFORCEMENT
+        : normalized === "stripe"
+          ? `VERSION ENFORCEMENT
+- Stripe: DO NOT invent required API version headers.
+- Keep Stripe API URLs, Authorization behavior, and request format guidance aligned with official docs.
+- If docs indicate method-specific payload changes, apply them without changing action keys.`
+          : normalized === "gmail"
+            ? `VERSION ENFORCEMENT
+      - Gmail: DO NOT invent required API version headers.
+      - Keep Gmail API base paths (gmail/v1), OAuth behavior, and push payload guidance aligned with official docs.
+      - If docs indicate method-specific payload changes, apply them without changing action keys.`
+            : `VERSION ENFORCEMENT
 - Use the latest versioning guidance from the official docs.
 - If the manifest contains an outdated version field or deprecated version recommendation, correct it from the docs.`;
 
