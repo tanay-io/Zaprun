@@ -234,7 +234,17 @@ export async function handleOutboxJob(outboxId: string) {
       );
       return;
     }
-
+    //fixed bug: what if somehow we have a malicious thing that puts wrong connectionId in the config? Like suppose
+    // slack token is in the config but the connection is for github provider it will fail everytime no matter what
+    // we also need to fix in the creation of zap too like we need to add a check in the post:/zaps endpoint
+    const stepProvider = step?.actionKey.split(".")[0];
+    if (connection.provider != stepProvider) {
+      await failWithConnectionError(
+        "CONNECTION_INVALID",
+        `Connection provider (${connection.provider}) does not match step provider (${stepProvider})`,
+      );
+      return;
+    }
     try {
       const resolvedAuth = await resolveConnectionAuth(connection);
 
