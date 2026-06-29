@@ -169,16 +169,13 @@ model ZapRunOutbox {
 
 model StepState {
   id String @id @default(cuid())
-
   zapRunId  String
   stepIndex Int
   attempt   Int
-
   status StepExecutionStatus
   output Json?
   error  Json?
   idempotencyKey String? @unique
-
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
 

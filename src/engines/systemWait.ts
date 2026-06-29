@@ -11,7 +11,7 @@ export async function handleSystemWait(
   const newRow = await prisma.zapRunOutbox.create({
     data: {
       zapRunId,
-      stepIndex: currentStepIndex,
+      stepIndex: currentStepIndex + 1,
       status: "pending",
       resumeAt,
       attempt: 0,

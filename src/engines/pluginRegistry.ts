@@ -130,6 +130,7 @@ export async function loadPlugins(): Promise<void> {
 
       const executors: Record<string, Executor> = {};
       for (const action of manifest.actions) {
+        // executor -> "sendmessage"    executorIndex ->{"sendMessage": executor}  actionManifestIndex ->{"sendmessage" : whole manifest}
         executors[action.key] = execute;
         executorIndex.set(action.key, execute);
         actionManifestIndex.set(action.key, action);
